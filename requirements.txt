@@ -1,0 +1,14 @@
+# Packages that are required to run fredrikas_lupp.py
+# To install all the needed packages, run:
+#
+# pip install -r requirements.txt
+#
+
+# Install wikitools py3 branch directly from github, because pypi version only supports python 2
+git+git://github.com/alexz-enwp/wikitools/@py3#egg=wikitools
+
+# Needed for wikitools
+requests>=2.20
+
+# Matplotlib for plotting category evolution graphs
+matplotlib>=3.1

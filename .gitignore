@@ -1,0 +1,17 @@
+# Editor and python files
+.idea/*
+.mypy_cache/*
+venv/*
+**/__pycache__/*
+
+# Files created by Fredrikas Lupp
+json/*
+pprint/*
+html/*
+wikitext/*
+analysis/*
+
+# Files for lists of pages
+*.txt
+# But don't skip requirements.txt
+!requirements.txt

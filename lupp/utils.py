@@ -1,0 +1,172 @@
+"""
+Different utility functions for the lupp.scrape module
+"""
+
+import codecs
+import json
+import os
+import sys
+import time
+from datetime import datetime, date
+from pathlib import Path
+from pprint import pprint
+
+
+def now_ymd_hms():
+    """Format date to Year Month Day Hour Minute Second"""
+    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+
+def now_dmy_hm():
+    """Format date to Year Month Day Hour Minute"""
+    return datetime.now().strftime("%d.%m.%Y kl. %H:%M")
+
+
+def now_ymd():
+    """Format date to Year Month Day"""
+    return date.today().strftime("%Y-%m-%d")
+
+
+def days_between(d1, d2):
+    """Calculate amount of days between two dates"""
+    d1 = datetime.strptime(d1, "%Y-%m-%d")
+    d2 = datetime.strptime(d2, "%Y-%m-%d")
+    return abs((d2 - d1).days)
+
+
+def quick_print(text):
+    """Print and flush without newline"""
+    sys.stdout.write(text)
+    sys.stdout.flush()
+    return
+
+
+def loading_bar(loading, data=None):
+    """Prints loading bar that keeps repeating until loading['status'] is set to True
+
+    Function that displays a loading bar that keeps repeating until
+    :parameter loading['status'] is set to True
+    :parameter data, dict containing 'pages', from where number of pages read are displayed
+
+    Intended to run in own thread while other threads work until all work is done
+    Will never terminate if run in main thread!"""
+    if data is None:
+        data = {}
+    i = 0
+    page_cnt = 0
+    while True:
+        if data and 'pages'in data:
+            page_cnt = len(data['pages'])
+        print(f"\rScraping pages [{'-'*(i // 500) + '>':<20}] {page_cnt} pages read", end='')
+        if not loading['status']:
+            print(f"\rScraping Done! {page_cnt} pages read")
+            break
+        i = (i + 1) % 10000
+        time.sleep(0.001)
+
+
+def make_dir(outdir):
+    """Create new direcotory, unless it already exists"""
+    if not os.path.exists(outdir):
+        os.makedirs(outdir)
+
+
+def save_utf_file(utf_file, fmt, s, dir_date=""):
+    """Saves the data from s to a file
+
+    Saves the content of utf_file to a file in a folder based on format and date.
+    All formats are saved in different folders with subfolders for different dates.
+    :param utf_file: Name of category/list of the data
+    :param fmt: What format the data is in, also specifies where file is saved
+    :param s: The data to be saved
+    :param dir_date: Specifies subfolder where file is to be saved. If empty, current date is used
+    """
+    dir_date = "" if dir_date == "" else f"/{dir_date}"
+    make_dir(f"./{fmt}{dir_date}")
+    utf_file = fmt + dir_date + "/" + utf_file
+    with codecs.open(utf_file, "w", "utf8") as f:
+        f.write(s)
+        print(f"Skapade {fmt}-filen {utf_file} ({len(s)} tecken)")
+
+
+def save_json_file(json_file, j, dir_date=""):
+    """Save python dict as json file
+
+    Save datta from python dict as a json file. Two files are created, one normal json file and
+    pretty printed text file with more easily readable json.
+    The files are created in json/ and pprint/ folders inside subfolders based the privided date
+
+    :param json_file: Name for the files
+    :param j: Python dict with the data
+    :param dir_date: Date for subfolder. If empty, current date is used
+    """
+    make_dir(f"./json/{dir_date}")
+    make_dir(f"./pprint/{dir_date}")
+    if "json/" not in json_file:
+        json_file = f"json/{dir_date}/" + json_file
+        ppfile = json_file.replace("json/", "pprint/")
+    else:
+        json_file = f"./json/{dir_date}/{json_file.split('/')[-1]}"
+        ppfile = json_file.replace("json/", "pprint/")
+    json.dump(j, open(json_file, 'w'))
+    print(f"\nSkrev json -filen {json_file} ({len(str(j))} tecken)")
+    ppfile = ppfile.replace(".json", ".txt")
+    with open(ppfile, "w") as fout:
+        pprint(j, fout)
+    print(f"\nSkrev pprint-filen {ppfile}")
+
+
+def save_used_cache(filename):
+    """Saves which cache file was last used"""
+    cache_title = filename.split('/')[-1][:-5]
+    used_cache = {'cache': filename, 'title': cache_title}
+    json.dump(used_cache, open("json/used_cache.json", 'w'))
+    print(f"Used cache: {filename}")
+
+
+def save_as_csv(scalars, has_title, other, tricky, category):
+    """Create csv file of the perameters, unused"""
+
+    # Header for CSV file
+    csv = "Title;URL;Category;"
+    csv += ";".join(tricky + scalars + has_title + other) + "\n"
+    save_utf_file(f"c_{category}.csv", "csv", csv)
+
+
+def find_path(category):
+    """Try to resolve path for json cache file for {category}"""
+    json_path = Path('./json')
+    json_path = list(json_path.glob(f'*/{category.replace(" ", "_")}.json'))
+    json_path.sort(reverse=True)
+    if json_path:
+        json_path = json_path[0]
+    else:
+        make_dir(f'json/{date.today()}')
+        json_path = f'./json/{date.today()}/{category.replace(" ", "_")}.json'
+    return str(json_path)
+
+
+def exit_program(start):
+    """Exit program and print stats for running time"""
+    end = datetime.now()
+    print(f"\nfredrikas_lupp.py slutade {end.strftime('%H:%M')} total svarstid {(end - start).seconds} s")
+    sys.exit()
+
+
+def list_json():
+    """Print list of all json-files in json/ directory"""
+    files = {}
+    for dirpath, dirnames, filenames in os.walk("./json"):
+        for filename in (f for f in filenames if f.endswith(".json")):
+            if "err_" in filename:
+                continue
+            if filename[:-5] in files.keys():
+                files[filename[:-5]].append(dirpath[7:])
+                files[filename[:-5]].sort(reverse=True)
+                continue
+            files.update({filename[:-5]: [dirpath[7:]]})
+    del files["used_cache"]
+    files_l = sorted(files, key=lambda x: files[x])
+    for f in files_l:
+        buffer = 50 - len(f)
+        print(f"{f} {'-' * buffer} {files[f]}")
