@@ -1,6 +1,6 @@
 # Fredrikas Lupp
 
-Fredrikas Lupp is a tool for analyzing categories or lists of pages on wikipedia.
+Fredrikas Lupp is a tool for analyzing categories or lists of pages on Wikipedia.
 Fredrikas Lupp works by using the [MediaWiki API](https://www.mediawiki.org/wiki/API:Main_page).
 
 Currently Fredrikas Lupp is developed to be used with Swedish or Finnish as primary language.
@@ -9,7 +9,7 @@ It does not yet support using other languages but is planned to have better supp
 ## Requirements & Installation
 
 Fredrikas Lupp requires Python 3.6 or later. It uses [Wikitools](https://github.com/alexz-enwp/wikitools/tree/py3) python 3 branch
-for communicating with mediawiki. 
+for communicating with Mediawiki. 
 
 To install:
 
@@ -24,7 +24,7 @@ pip3 install -r requirements.txt
 
 ## Usage
 
-The primary usage for Fredrikas Lupp is to scrape a category on wikipedia and compare the pages in the category between
+The primary usage for Fredrikas Lupp is to scrape a category on Wikipedia and compare the pages in the category between
 a few languages to find where the primary language is lacking compared to others. The data that is scraped is saved as
 a json file.
 
