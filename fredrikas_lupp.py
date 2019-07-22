@@ -88,14 +88,14 @@ Languages to use for the scraping can be specified after the category name as
 a pipe ('|') separated list. Requires at least two languages. If not specified
 'sv|fi|en|de' is the default and will be used.
 
-Example: python3 fredriaks_lupp.py scrape Nagu 'sv|fi|dk|no'
+Example: python3 fredrikas_lupp.py scrape Nagu 'sv|fi|dk|no'
 
 Currently only supports using sv or fi as primary or secondary languages.
 
 Max depth can be specified for how deep into subcategories the script will go.
 Default is 10. To specify max depth, language also has to be specified.
 
-Example: python3 fredriaks_lupp.py scrape Nagu 'sv|fi|en|de' 2
+Example: python3 fredrikas_lupp.py scrape Nagu 'sv|fi|en|de' 2
         ''')
         utils.exit_program(start)
     success = scrape.scrape_launch(d, e, sites, api_fields, max_depth, blacklist, top_category, languages)
@@ -180,7 +180,7 @@ if cmd == 'page':
         print('''
 Show stats for a single page. Category first has to be choosen with 'use CATEGORY'
 
-Usage: python3 fredriaks_lupp.py page Nagu
+Usage: python3 fredrikas_lupp.py page Nagu
         ''')
         utils.exit_program(start)
     json_exists = os.path.isfile(used_cache['cache'])
@@ -300,7 +300,7 @@ on wikipedia, to compare between languages, and find where improvement is needed
 It can also be used to automatically run scrapes and publish results
 on a mediawiki site.
 
-Example: python3 fredriaks_lupp.py scrape Nagu
+Example: python3 fredrikas_lupp.py scrape Nagu
 
 Commands:
   scrape CATEGORY         Run new scrape for CATEGORY and save josn file with the data
@@ -316,22 +316,22 @@ Commands:
   split CATEGORY          Use exisitng josn file and split main cateogry into all its subcategories
   page CATEGORY           Show stats for a single page. Category first has to be choosen with 'use CATEGORY'
   analyze CATEGORY        Visualize growth of CATEGORY based on existing josn files. Requires at least 2 files.
-  
+
 For more information about specific commands use: python3 frderikas_lupp.py command help
-  
+
 
 Languages to use for the scraping can be specified after the category name as
 a pipe ('|') separated list. Requires at least two languages. If not specified
 'sv|fi|en|de' is the default and will be used.
 
-Example: python3 fredriaks_lupp.py scrape Nagu 'sv|fi|dk|no'
+Example: python3 fredrikas_lupp.py scrape Nagu 'sv|fi|dk|no'
 
 Currently only supports using sv or fi as primary or secondary languages.
 
 Max depth can be specified for how deep into subcategories the script will go.
 Default is 10. To specify max depth, language also has to be specified.
 
-Example: python3 fredriaks_lupp.py scrape Nagu 'sv|fi|en|de' 2
+Example: python3 fredrikas_lupp.py scrape Nagu 'sv|fi|en|de' 2
 
     ''')
 else:
