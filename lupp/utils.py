@@ -2,7 +2,6 @@
 Different utility functions for the lupp.scrape module
 """
 
-import codecs
 import json
 import os
 import sys
@@ -65,10 +64,10 @@ def loading_bar(loading, data=None):
         time.sleep(0.001)
 
 
-def make_dir(outdir):
+def make_dir(outdir_path):
     """Create new direcotory, unless it already exists"""
-    if not os.path.exists(outdir):
-        os.makedirs(outdir)
+    if not outdir_path.exists():
+        outdir_path.mkdir()
 
 
 def save_utf_file(utf_file, fmt, s, dir_date=""):
@@ -81,10 +80,10 @@ def save_utf_file(utf_file, fmt, s, dir_date=""):
     :param s: The data to be saved
     :param dir_date: Specifies subfolder where file is to be saved. If empty, current date is used
     """
-    dir_date = "" if dir_date == "" else f"/{dir_date}"
-    make_dir(f"./{fmt}{dir_date}")
-    utf_file = fmt + dir_date + "/" + utf_file
-    with codecs.open(utf_file, "w", "utf8") as f:
+    path = Path('.') / fmt / dir_date
+    make_dir(path)
+    utf_file = path / utf_file
+    with open(utf_file, "w") as f:
         f.write(s)
         print(f"Skapade {fmt}-filen {utf_file} ({len(s)} tecken)")
 
@@ -100,17 +99,19 @@ def save_json_file(json_file, j, dir_date=""):
     :param j: Python dict with the data
     :param dir_date: Date for subfolder. If empty, current date is used
     """
-    make_dir(f"./json/{dir_date}")
-    make_dir(f"./pprint/{dir_date}")
-    if "json/" not in json_file:
-        json_file = f"json/{dir_date}/" + json_file
-        ppfile = json_file.replace("json/", "pprint/")
+    json_dir = Path("json") / dir_date
+    make_dir(json_dir)
+    pprint_dir = Path("pprint") / dir_date
+    make_dir(pprint_dir)
+    if "json" not in json_file.parts:
+        json_file = Path("json") / dir_date / json_file
+        ppfile = Path("pprint").joinpath(*json_file.parts[1:])
     else:
-        json_file = f"./json/{dir_date}/{json_file.split('/')[-1]}"
-        ppfile = json_file.replace("json/", "pprint/")
+        json_file = Path("json") / dir_date / json_file.name
+        ppfile = Path("pprint").joinpath(*json_file.parts[1:])
     json.dump(j, open(json_file, 'w'))
     print(f"\nSkrev json -filen {json_file} ({len(str(j))} tecken)")
-    ppfile = ppfile.replace(".json", ".txt")
+    ppfile = ppfile.with_suffix('.txt')
     with open(ppfile, "w") as fout:
         pprint(j, fout)
     print(f"\nSkrev pprint-filen {ppfile}")
@@ -118,9 +119,9 @@ def save_json_file(json_file, j, dir_date=""):
 
 def save_used_cache(filename):
     """Saves which cache file was last used"""
-    cache_title = filename.split('/')[-1][:-5]
-    used_cache = {'cache': filename, 'title': cache_title}
-    json.dump(used_cache, open("json/used_cache.json", 'w'))
+    cache_title = filename.stem
+    used_cache = {'cache': filename.as_posix(), 'title': cache_title}
+    json.dump(used_cache, open(Path("json") / "used_cache.json", 'w'))
     print(f"Used cache: {filename}")
 
 
@@ -135,15 +136,16 @@ def save_as_csv(scalars, has_title, other, tricky, category):
 
 def find_path(category):
     """Try to resolve path for json cache file for {category}"""
-    json_path = Path('./json')
+    json_path = Path('json')
     json_path = list(json_path.glob(f'*/{category.replace(" ", "_")}.json'))
     json_path.sort(reverse=True)
     if json_path:
         json_path = json_path[0]
     else:
-        make_dir(f'json/{date.today()}')
-        json_path = f'./json/{date.today()}/{category.replace(" ", "_")}.json'
-    return str(json_path)
+        path_with_date = Path("json") / str(date.today())
+        make_dir(path_with_date)
+        json_path = path_with_date / f"{category.replace(' ', '_')}.json"
+    return json_path
 
 
 def exit_program(start):
@@ -156,7 +158,7 @@ def exit_program(start):
 def list_json():
     """Print list of all json-files in json/ directory"""
     files = {}
-    for dirpath, dirnames, filenames in os.walk("./json"):
+    for dirpath, dirnames, filenames in os.walk("json"):
         for filename in (f for f in filenames if f.endswith(".json")):
             if "err_" in filename:
                 continue

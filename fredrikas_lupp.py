@@ -14,13 +14,13 @@ import os.path
 import json
 from pathlib import Path
 
-import lupp.utils
 from lupp import scrape, html, plot, utils
 
 used_cache = {'cache': 'None', 'title': 'None'}
-cache_path = "json/used_cache.json"
-if Path(cache_path).exists():
+cache_path = Path("json") / "used_cache.json"
+if cache_path.exists():
     used_cache = json.load(open(cache_path))
+    used_cache['cache'] = Path(used_cache['cache'])
 
 cnt_arg = len(sys.argv)
 
@@ -29,8 +29,8 @@ languages = "sv|fi|en|de" if cnt_arg < 4 else sys.argv[3]
 top_category = used_cache['title'] if cnt_arg < 3 else sys.argv[2]
 cmd = "help" if cnt_arg < 2 else sys.argv[1]
 
-jsonfile = used_cache['cache'] if cnt_arg < 3 else utils.find_path(top_category)
-errfile = f"err_{top_category}".join(jsonfile.split(top_category.replace(" ", "_")))
+jsonfile = Path(used_cache['cache']) if cnt_arg < 3 else utils.find_path(top_category)
+errfile = jsonfile.with_name(f"err_{top_category}.json")
 
 start = datetime.now()
 print(f"python fredrikas_lupp.py {cmd} {top_category} {languages} "
@@ -275,7 +275,7 @@ Usage: python3 fredrikas_lupp.py list
         ''')
         utils.exit_program(start)
     print("\nKategorier det finns json-dumpar för:\n")
-    lupp.utils.list_json()
+    utils.list_json()
 
 elif cmd == 'split':
     if top_category == 'help':

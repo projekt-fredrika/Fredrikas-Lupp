@@ -1370,7 +1370,7 @@ def publish(d, e, api_fields, category, subpages=True):
     save_as_wikitext(d, e, api_fields, category, page_type='top100')
 
     # Locate newly created files
-    wikitext_file = Path(f"./wikitext")
+    wikitext_file = Path(f"wikitext")
     wikitext_file = list(wikitext_file.glob(f'*/c_{category}.txt'))
     wikitext_file.sort(reverse=True)
     wikitext_file_exists = False
@@ -1383,7 +1383,7 @@ def publish(d, e, api_fields, category, subpages=True):
     with open(str(wikitext_file), "r") as textfile:
         text = ''.join(textfile.readlines())
 
-    wikitext_contrib_file = Path(f"./wikitext")
+    wikitext_contrib_file = Path(f"wikitext")
     wikitext_contrib_file = list(wikitext_contrib_file.glob(f'*/contrib_{category}.txt'))
     wikitext_contrib_file.sort(reverse=True)
     wikitext_contrib_file_exists = False
@@ -1396,7 +1396,7 @@ def publish(d, e, api_fields, category, subpages=True):
     with open(str(wikitext_contrib_file)) as textfile:
         contrib_text = ''.join(textfile.readlines())
 
-    top100_file = Path(f"./wikitext")
+    top100_file = Path(f"wikitext")
     top100_file = list(top100_file.glob(f'*/c_{category}_top100.txt'))
     top100_file.sort(reverse=True)
     top100_file_exists = False
