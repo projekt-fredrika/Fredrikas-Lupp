@@ -1,5 +1,6 @@
 # Editor and python files
 .idea/*
+.vim/*
 .mypy_cache/*
 venv/*
 **/__pycache__/*
