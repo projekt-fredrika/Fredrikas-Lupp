@@ -291,11 +291,11 @@ Usage: python3 fredrikas_lupp.py split Nagu
 
 elif cmd == 'help':
     print('''
-Fredriaks Lupp - Wikipedia analyzing tool
+Fredrikas Lupp - Wikipedia analyzing tool
 
 Usage: python3 fredrikas_lupp.py command CATEGORY [languages] [max_depth]
 
-Fredriaks Lupp is a tool for analyzing categories or groups of pages
+Fredrikas Lupp is a tool for analyzing categories or groups of pages
 on wikipedia, to compare between languages, and find where improvement is needed.
 It can also be used to automatically run scrapes and publish results
 on a mediawiki site.

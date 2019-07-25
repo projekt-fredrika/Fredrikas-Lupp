@@ -78,7 +78,7 @@ from pathlib import Path
 from wikitools import exceptions, wiki, api, page
 
 from lupp.html import HTML, tr, th, thl, tdr, td, red, bold, italic
-from lupp.utils import now_ymd_hms, days_between, quick_print, loading_bar, save_utf_file, save_json_file
+from lupp.utils import now_ymd_hms, days_between, loading_bar, save_utf_file, save_json_file
 from lupp.wikitext import table_start, align, cell, rowspan, colspan, w_red, w_bold, w_italic
 
 
@@ -219,14 +219,14 @@ def _scrape_category(d, e, max_depth, sites, blacklist, api_fields,
     e['timestamp'][full_title_lang] = now_ymd_hms()
     category_exists = full_title_lang in d['categories']
     if category_exists and not force:
-        print(f"\r- Category titled {full_title_lang} already exists, skipping")
+        # print(f"\r- Category titled {full_title_lang} already exists, skipping") TODO: proper logging
         return
     # only scrape page and not category if max_depth reached
     elif depth >= int(max_depth):
         tpe.submit(_scrape_pages, d, e, api_fields, category_title, lang, is_category=True)
         return
 
-    print(f"\rCategory title: {category_title}")
+    # print(f"\rCategory title: {category_title}") TODO: proper logging
 
     d['stats']['categories_cnt'] += 1
     category_itself = f"{category_title} ({lang})"
@@ -330,12 +330,12 @@ def _scrape_article_list(d, e, sites, api_fields, filename, lang="en"):
     site = sites[lang] = wiki.Wiki(f"https://{lang}.wikipedia.org/w/api.php")
 
     titles = '|'.join(articles)
-    print(f'Checking {len(articles)} pages')
+    # print(f'Checking {len(articles)} pages') TODO: proper logging
     is_category = False
     for full_title in articles:
-        print(f"Article {full_title}")
+        # print(f"Article {full_title}") TODO: proper logging
         full_title_lang = f"{full_title} ({lang})"
-        print(f"full_title_lang {full_title_lang}")
+        # print(f"full_title_lang {full_title_lang}") TODO: proper logging
         d['stats']['pages_cnt'] += 1
         d['pages'][full_title_lang] = {'title': full_title,
                                        'is_category': is_category}
@@ -354,11 +354,10 @@ def _scrape_article_list(d, e, sites, api_fields, filename, lang="en"):
         # Create batches of results on individual items within page
         for sub_result in req_links.queryGen():  # async_gen(req_links):
             j += 1
-            quick_print(f"\r{(j % 10) * '.':<10}{j}")
             pages = sub_result['query']['pages']
             for page_id in list(pages):
                 if page_id == '-1':
-                    print(f'Page {pages[page_id]["title"]} does not exist')
+                    # print(f'Page {pages[page_id]["title"]} does not exist')  TODO: proper logging
                     continue
                 pageinfo = pages[page_id]
                 # Loop individual scalar fields
@@ -393,7 +392,7 @@ def _scrape_article_list(d, e, sites, api_fields, filename, lang="en"):
                     for item in pageinfo['extlinks']:
                         d['pages'][full_title_lang]['extlinks'].append(item['*'])
 
-    print(f"\r({[len(d['pages'][f'{ftl} ({lang})']['langlinks']) for ftl in articles]} langs)")
+    # print(f"\r({[len(d['pages'][f'{ftl} ({lang})']['langlinks']) for ftl in articles]} langs)") TODO: proper logging
 
 
 def _scrape_sections(d, e, title, lang):
@@ -455,15 +454,12 @@ def _scrape_pages(d, e, api_fields, titles, lang, is_category, quickscan=False):
     :return: None
     """
     full_titles = titles.split('|')
-    # -quick_print(f"Lang: {lang}- ")
     for full_title in full_titles.copy():
         full_title_lang = f"{full_title} ({lang})"
         page_exists = full_title_lang in d['pages']
         if page_exists:
-            # quick_print(f"Page {full_title_lang} already exists, skipping")
             full_titles.remove(full_title)
             continue
-        # quick_print(f"{full_title}, ")
         d['stats']['pages_cnt'] += 1
         d['pages'][full_title_lang] = {'title': full_title,
                                        'is_category': is_category}
@@ -474,7 +470,7 @@ def _scrape_pages(d, e, api_fields, titles, lang, is_category, quickscan=False):
     if not full_titles:
         return
     titles = '|'.join(full_titles)
-    # print(f'scrape_pages {full_titles}')
+    # print(f'scrape_pages {full_titles}') TODO: proper logging
 
     site = wiki.Wiki(f"https://{lang}.wikipedia.org/w/api.php")
     params = {'action': 'query', 'titles': titles, 'prop': api_fields['prop'], **api_fields['max_limits']}
@@ -483,12 +479,11 @@ def _scrape_pages(d, e, api_fields, titles, lang, is_category, quickscan=False):
     # Create batches of results on individual items within page
     for sub_result in req_links.queryGen():  # async_gen(req_links):
         j += 1
-        # quick_print(f"\r{(j % 10) * '.':<10}")
         pages = sub_result['query']['pages']
         # page_id = list(pages)[0]
         for page_id in list(pages):
             if page_id == '-1':
-                print(f'Sidan {pages[page_id]["title"]} finns inte')
+                # print(f'Sidan {pages[page_id]["title"]} finns inte') TODO: proper logging
                 continue
             pageinfo = pages[page_id]
             full_title_lang = f"{pageinfo['title']} ({lang})"
@@ -529,7 +524,7 @@ def _scrape_pages(d, e, api_fields, titles, lang, is_category, quickscan=False):
                 _scrape_sections(d, e, pageinfo['title'], lang)
                 _scrape_revisions(d, e, pageinfo['title'], lang)
 
-    # print(f"\r({[len(d['pages'][f'{ftl} ({lang})']['langlinks']) for ftl in full_titles]} langs)")
+    # print(f"\r({[len(d['pages'][f'{ftl} ({lang})']['langlinks']) for ftl in full_titles]} langs)")TODO: proper logging
 
 
 def _scrape_lang(d, e, api_fields, langs, primary_lang, tpe=None):
@@ -551,10 +546,9 @@ def _scrape_lang(d, e, api_fields, langs, primary_lang, tpe=None):
             p_to_scrape = {l: [] for l in other_langs}
 
         pages = d['categories'][title]['pages']
-        print(f"\rscrape_lang: Category {title}")
+        # print(f"\rscrape_lang: Category {title}") TODO: proper logging
         is_category = False
         for p in pages:
-            # print(f"\r- page {p}")
             if p not in d['pages']:
                 continue
             is_category = d['pages'][p]['is_category']
@@ -566,7 +560,6 @@ def _scrape_lang(d, e, api_fields, langs, primary_lang, tpe=None):
                     continue
                 if lang not in p_to_scrape:
                     p_to_scrape[lang] = []
-                # print(f"lang {lang}")
                 if limited_langs:
                     if lang not in other_langs:
                         continue
@@ -577,14 +570,12 @@ def _scrape_lang(d, e, api_fields, langs, primary_lang, tpe=None):
                     l_title = l_title[:hashtag_index]
                 p_to_scrape[lang] += [l_title]
         p_to_scrape = {k: v for k, v in p_to_scrape.items() if v}
-        # print(f"p_to_scrape {p_to_scrape}")
+        # print(f"p_to_scrape {p_to_scrape}") TODO: proper logging
         for b_l in p_to_scrape:
             batch = p_to_scrape[b_l]
-            # print(f"- batch {batch}")
             # cut batch size to 50 to retrieve 50 pages at a time from the API
             for i in range(0, len(batch), 50):
                 batch_string = '|'.join(batch[i:i + 50])
-                # print(f"scrape_lang anropar scrape_pages({batch_string}, {b_l}, {i}, {is_category}")
                 tpe.submit(_scrape_pages, d, e, api_fields, batch_string, b_l, is_category, quickscan=True)
 
 
@@ -604,7 +595,7 @@ def _scrape_missing_primary_language(d, e, max_depth, sites, blacklist, api_fiel
         second_lang_title = ""
         # todo-me: underliga if-tester
         if category_title not in d['pages']:
-            print(f"**** Category title {category_title} not in d[''pages'']")
+            # print(f"**** Category title {category_title} not in d[''pages'']") TODO: proper logging
             continue
         if 'langlinks' not in d['pages'][category_title]:
             continue
@@ -616,7 +607,8 @@ def _scrape_missing_primary_language(d, e, max_depth, sites, blacklist, api_fiel
                 break
         if second_lang_title == "":
             continue
-        print(f"\rChecking category {second_lang_title} in secondary language matching category {category_title}")
+        # print(f"\rChecking category {second_lang_title} in secondary language matching category {category_title}")
+        # TODO: proper logging
 
         # Read the entire 'fi' category "once again" (to catch missing pages)
         _scrape_category(d, e, max_depth, sites, blacklist, api_fields, second_lang_title,
@@ -655,11 +647,9 @@ def analyse_pagestats(d, e, api_fields):
     for p in l_pages:
         d['pages'][p]['stats'] = {}
         stats = d['pages'][p]['stats']
-        # print " ", p, d['pages'][p]['touched']
         anon = int(d['pages'][p].get('anoncontributors', 0))
         known = len(d['pages'][p]['contributors'])
         stats['contributors_tot'] = str(anon + known)
-        # print(f"- {p}: {stats['contributors_tot']} ")
 
         # Zero the counters for the page
         count = {}
@@ -693,7 +683,6 @@ def analyse_pagestats(d, e, api_fields):
                            2 * points('extlinks_cnt') + \
                            3 * points('redirects_cnt') + \
                            1 * points('contributors_tot')
-        # print(u"Räknar p %s" % p)
         if "(sv)" in p:
             stats['pageviews_sv'] = str(count['pageviews'])
             stats['len_sv'] = d['pages'][p]['length']
@@ -714,7 +703,7 @@ def analyse_langstats(d, e):
         for l_item in d['pages'][p]['langlinks']:
             l = list(l_item)[0]
             l_title = l_item[l]
-            # -print(f"p {p} l {l} title {l_title}")
+            # -print(f"p {p} l {l} title {l_title}") TODO: proper logging
             if l in languages:
                 # l_title = d['pages'][p]['langlinks'][l]
                 p_in_lang = f"{l_title} ({l})"

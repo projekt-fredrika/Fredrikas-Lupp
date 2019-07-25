@@ -33,13 +33,6 @@ def days_between(d1, d2):
     return abs((d2 - d1).days)
 
 
-def quick_print(text):
-    """Print and flush without newline"""
-    sys.stdout.write(text)
-    sys.stdout.flush()
-    return
-
-
 def loading_bar(loading, data=None):
     """Prints loading bar that keeps repeating until loading['status'] is set to True
 
@@ -53,9 +46,15 @@ def loading_bar(loading, data=None):
         data = {}
     i = 0
     page_cnt = 0
+    shown_categories = set()
     while True:
         if data and 'pages'in data:
             page_cnt = len(data['pages'])
+        if data and 'categories' in data:
+            new_cats = set(data['categories'].keys())
+            for new in new_cats.difference(shown_categories):
+                print(f"\rCategory title: {new}")
+            shown_categories = new_cats
         print(f"\rScraping pages [{'-'*(i // 500) + '>':<20}] {page_cnt} pages read", end='')
         if not loading['status']:
             print(f"\rScraping Done! {page_cnt} pages read")
