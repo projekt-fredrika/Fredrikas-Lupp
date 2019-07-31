@@ -1340,12 +1340,12 @@ def publish(d, e, api_fields, category, subpages=True):
     Enviroment variables can be used for site name and login credentails to support running the scrpt automatically."""
 
     # setup site and login, try to use env variables, otherwise ask user
-    site = wiki.WIki()
+    site = wiki.Wiki()
     if 'WIKISITE' not in os.environ:
-        sitename = input("WIki site urL:")
+        sitename = input("Wiki site url:")
         site = wiki.Wiki(sitename)
     else:
-        site = wiki.WIki(os.environ['WIKISITE'])
+        site = wiki.Wiki(os.environ['WIKISITE'])
     if 'WIKIUSER' not in os.environ or 'WIKIPASSWORD' not in os.environ:
         site = wiki.Wiki("http://projektfredrika.fi/api.php")
         user = input("Login name:")

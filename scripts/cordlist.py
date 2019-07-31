@@ -46,7 +46,7 @@ def get_infobox(title):
 
     par = {'action': 'raw', 'title': title}
     url = f"https://{WIKI_LANG}.wikipedia.org/w/index.php"
-    r = requests.get(url, par, time, timeout=5)
+    r = requests.get(url, par, timeout=5)
     lines = r.text.split('\n')
     fields = {}
     for l in lines:
