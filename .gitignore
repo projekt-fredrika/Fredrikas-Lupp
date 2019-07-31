@@ -14,5 +14,6 @@ analysis/*
 
 # Files for lists of pages
 *.txt
+*.csv
 # But don't skip requirements.txt
 !requirements.txt
