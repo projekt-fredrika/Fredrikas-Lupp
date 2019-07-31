@@ -65,8 +65,9 @@ def loading_bar(loading, data=None):
 
 def make_dir(outdir_path):
     """Create new direcotory, unless it already exists"""
-    if not outdir_path.exists():
-        outdir_path.mkdir()
+    for path in list(reversed(outdir_path.parents)) + outdir_path:
+        if not path.exists():
+            path.mkdir()
 
 
 def save_utf_file(utf_file, fmt, s, dir_date=""):
@@ -82,7 +83,7 @@ def save_utf_file(utf_file, fmt, s, dir_date=""):
     path = Path('.') / fmt / dir_date
     make_dir(path)
     utf_file = path / utf_file
-    with open(utf_file, "w") as f:
+    with open(utf_file, "w", encoding='utf-8') as f:
         f.write(s)
         print(f"Skapade {fmt}-filen {utf_file} ({len(s)} tecken)")
 
@@ -111,7 +112,7 @@ def save_json_file(json_file, j, dir_date=""):
     json.dump(j, open(json_file, 'w'))
     print(f"\nSkrev json -filen {json_file} ({len(str(j))} tecken)")
     ppfile = ppfile.with_suffix('.txt')
-    with open(ppfile, "w") as fout:
+    with open(ppfile, "w", encoding='utf-8') as fout:
         pprint(j, fout)
     print(f"\nSkrev pprint-filen {ppfile}")
 
