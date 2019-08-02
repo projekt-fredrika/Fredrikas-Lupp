@@ -120,10 +120,11 @@ def main():
             except Exception as e:
                 print(f"Exception retrieving data: {e}")
     stats = analyze_stats(user_contrib)
-    with open(f"{user}.txt", 'w') as userfile:
+    interval = from_date.strftime('%Y-%m-%d') + '--' + to_date[:10]
+    with open(f"{user}_{interval}.txt", 'w') as userfile:
         for key, value in stats.items():
             userfile.write(f"{key}: {value}\n")
-    with open(f"{user}.csv", 'w') as csvfile:
+    with open(f"{user}_{interval}.csv", 'w') as csvfile:
         writer = csv.writer(csvfile)
         for lang, pages in user_contrib.items():
             for page in pages:
