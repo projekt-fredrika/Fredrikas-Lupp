@@ -29,10 +29,13 @@ Data will be different for different actions
 
 """
 
-import pywikibot
 import csv
+import re
 import traceback
+from math import radians, sin, cos, asin, sqrt, atan2, degrees
 from pathlib import Path
+
+import pywikibot
 
 
 def specify_categories(msg, site):
@@ -55,6 +58,208 @@ def specify_categories(msg, site):
     return cat_list
 
 
+def distance_and_direction(lat1, lon1, lat2, lon2):
+    lat1, lon1, lat2, lon2 = [radians(float(c)) for c in [lat1, lon1, lat2, lon2]]
+
+    d_lat = lat2 - lat1
+    d_lon = lon2 - lon1
+    a = sin(d_lat / 2) ** 2 + cos(lat1) * cos(lat2) * sin(d_lon / 2) ** 2
+    c = 2 * asin(sqrt(a))
+
+    km = 6367 * c
+
+    # compass direction calculation
+    x = sin(d_lon) * cos(lat2)
+    y = cos(lat1) * sin(lat2) - (sin(lat1) * cos(lat2) * cos(d_lon))
+    bearing = (degrees(atan2(x, y)) + 360) % 360
+    dirs = ['norr', 'nordost', 'öster', 'sydost', 'söder', 'sydväst', 'väster', 'nordväst']
+    dir_idx = int((bearing + 22.5) / 45 - 0.02)
+    return km, dirs[dir_idx % 8]
+
+
+def edit_page(action, site, name, data, category_list=(), remove_list=(), addonly=False, auto=False):
+    if category_list is None:
+        category_list = []
+    page = pywikibot.Page(site, name)
+    if not page.exists():
+        pywikibot.output(f"Page {name} does not exist, skipping")
+        return
+
+    if action == 'add-to-category':
+        cats = page.categories()
+        pywikibot.output(f"categories: ,  {[x for x in cats]}")
+        new_category = [c for c in category_list if data.lower() in
+                        c.title().lower()]
+        try:
+            old_category = [c for c in remove_list if c in cats][0]
+        except IndexError:
+            pywikibot.output(f"Warning!! -- {name} does not belong to old category {remove_list}, skipping")
+            return
+        if new_category and new_category[0] not in cats:
+            pywikibot.output(f"Add to {new_category[0]}")
+            if auto or (pywikibot.input("Confirm Y/n: ") + 'y')[0].lower() != 'n':
+                # Add to new category
+                new_text = pywikibot.textlib.replaceCategoryInPlace(page.text, old_category,
+                                                                    new_category[0], add_only=addonly)
+                page.text = new_text
+                page.save('Changed category')
+                pywikibot.output(f"Adding to category {new_category}")
+
+    if action == 'rename':
+        new_name = data
+        new_page = pywikibot.page.Page(site, new_name)
+        if page.isRedirectPage():
+            pywikibot.output(f"!!!!!  Page {name} is only a redirect - skipping")
+            return
+        if new_page.exists():
+            pywikibot.output(f"!!!!!  Cannot move {name} to existing page {new_name}")
+            return
+        pywikibot.output(f"Moving {name} ----> {new_name}")
+        summary = 'Förenklar sidonamn baserat på ' \
+                  'https://sv.wikipedia.org/wiki/Wikipedia:Projekt_Fredrika/' \
+                  'Nagu_%C3%B6ar/Namnbytesf%C3%B6rslag'
+        if auto or (pywikibot.input("Confirm Y/n: ") + 'y')[0].lower() != 'n':
+            try:
+                site.movepage(page, new_name, summary)
+            except Exception as e:
+                pywikibot.output(f"Could not move page {name}: {e}")
+        else:
+            pywikibot.output(f"Not moving page {name}")
+
+    if action == 'list':
+        if auto or (pywikibot.input("Continue Y/n: ") + 'y')[0].lower() == 'n':
+            return
+
+    if action == 'text-rename':
+        changes_made = 0
+
+        # Calculate coords and names from data
+        lat, lon, close, boat = data.split('|')
+        close_cords = pywikibot.page.Page(site, close).coordinates()[0]
+        if " (" in close:
+            closelink = f"[[{close}|{close.split(' (')[0]}]]"
+            close = close.split(' (')[0]
+        elif ", " in close:
+            closelink = f"[[{close}|{close.split(', ')[0]}]]"
+            close = close.split(', ')[0]
+        else:
+            closelink = f"[[{close}]]"
+        if " (" in boat:
+            boatlink = f"[[{boat}|{boat.split(' (')[0]}]]"
+            boat = boat.split(' (')[0]
+        elif ", " in boat:
+            boatlink = f"[[{boat}|{boat.split(', ')[0]}]]"
+            boat = boat.split(', ')[0]
+        else:
+            boatlink = f"[[{boat}]]"
+
+        boatnames = {
+            "M/S Eivor": ['Pärnäs', 'Berghamn', 'Nötö', 'Aspö', 'Jurmo', 'Utö'],
+            "M/S Nordep": ['Kirjais', 'Brännskär', 'Stenskär', 'Gullkrona', 'Pensar',
+                           'Grötö', 'Kopparholm', 'Träskholm', 'Björkö', 'Trunsö', 'Sandholm', 'Lökholm', 'Borstö'],
+            "M/S Falkö": ['Nagu', 'Själö', 'Innamo', 'Järvsor', 'Maskinnamo', 'Åvensor'],
+            "M/S Östern": ['Nagu', 'Själö'],
+            "M/S Cheri": ['Pärnäs', 'Krok', 'Mattnäs', 'Lånholm', 'Fagerholm', 'Ängsö', 'Tveskiftsholm', 'Berghamn',
+                          'Hummelholm', 'Rockelholm', 'Ytterholm', 'Brännskär', 'Grötö', 'Stenskär', 'Gullkrona',
+                          'Kirjais']
+        }
+
+        # Insert closest big island and Nagu in text
+        start = re.compile(r'(?<=\[\[ö \(landområde\)\|ö\]\]) i')
+        if re.search(start, page.text) and not re.search(r'\[\[Nagu\]\]', page.text):
+            replacement = f" nära {closelink} i [[Nagu]], "
+            pywikibot.output(f"{re.search(start, page.text).group()} --> {replacement})")
+            page.text, n = re.subn(start, replacement, page.text)
+            changes_made += n
+
+        # Insert Nagu Kommundel in infobox
+        dist = re.compile(r'(?<=\| district)\s*=')
+        if re.search(dist, page.text):
+            pywikibot.output(f"{re.search(dist, page.text).group()} --> [[Nagu]]")
+            page.text, n = re.subn(dist, f"{' ' * 16}= [[Nagu]]", page.text)
+            changes_made += n
+
+            distn = re.compile(r'(?<=\| district_type)\s*=')
+            if re.search(distn, page.text):
+                pywikibot.output(f"{re.search(distn, page.text).group()} --> [[Kommundel]]")
+                page.text, n = re.subn(distn, f"{' ' * 11}= [[Kommundel]]", page.text)
+                changes_made += n
+            else:
+                pywikibot.output(f"Saknade district_type")
+                page.text, n = re.subn(r'(?<= = \[\[Nagu\]\]$)',
+                                       f"| district_type{' ' * 11}= [[Kommundel]]",
+                                       page.text)
+
+        else:
+            # Insert whole | district = [[Nagu]]
+            pywikibot.output(f"Saknade district och district_type")
+            mun_pat = re.compile(r'(?=\| municipality )')
+            if re.search(mun_pat, page.text):
+                pywikibot.output(f"{re.search(mun_pat, page.text).group()}"
+                                 f" --> district=[[Nagu]] district_type=[[Kommundel]]")
+                page.text, n = re.subn(mun_pat, f"| district{' '*16}= [[Nagu]]\n"
+                                                f"| district_type{' '*11}= [[Kommundel]]\n", page.text)
+                changes_made += n
+
+        # Insert distances to closest 1.big island, 2. Nagu kyrkbacken, 3. If missing: Åbo
+        distance = re.compile(r'(?<=Ön ligger omkring)')
+        no_abo = re.compile(r', i den (södra|sydvästra) delen av landet, ')
+        if re.search(distance, page.text):
+            close_dist, close_dir = distance_and_direction(close_cords.lat, close_cords.lon, lat, lon)
+            kyrk_dist, kyrk_dir = distance_and_direction(60.194, 21.906, lat, lon)
+            replacement = (f" {close_dist:.0f} kilometer {close_dir} om {closelink}, "
+                           f"{kyrk_dist:.0f} kilometer {kyrk_dir} om [[Nagu kyrka]],")
+            pywikibot.output(f"{re.search(distance, page.text).group()} --> {replacement}")
+            page.text, n = re.subn(distance, replacement, page.text)
+            changes_made += n
+        elif re.search(no_abo, page.text):
+            close_dist, close_dir = distance_and_direction(close_cords.lat, close_cords.lon, lat, lon)
+            kyrk_dist, kyrk_dir = distance_and_direction(60.194, 21.906, lat, lon)
+            abo_dist, abo_dir = distance_and_direction(60.4528, 22.2722, lat, lon)
+            replacement = (f". Ön ligger omkring {close_dist:.0f} kilometer {close_dir} om {closelink}, "
+                           f"omkring {kyrk_dist:.0f} kilometer {kyrk_dir} om [[Nagu kyrka]],"
+                           f" {abo_dist:.0f} kilometer {abo_dir} om Åbo och ")
+            pywikibot.output(f"{re.search(no_abo, page.text).group()} --> {replacement}")
+            page.text, n = re.subn(no_abo, replacement, page.text)
+            changes_made += n
+
+        # Insert closest ferry location and waht boats traffic it at the end of intro text.
+        add = re.compile(r'om (huvudstaden )?\[\[Helsingfors\]\]\.')
+        if re.search(add, page.text) and close != name.split(', ')[0] and not re.search(r'förbindelse', page.text):
+            boats = [k for k, v in boatnames.items() if boat in v]
+            boats_plural = 'en' if len(boats) == 1 else 'arna'
+            boats_str = ' och '.join(boats)
+            replacement = 'om [[Helsingfors]].'
+            if boat == name.split(', ')[0]:
+                replacement = replacement + f" Förbindelsebåt{boats_plural} {boats_str} traffikerar {name}."
+            else:
+                replacement = replacement + (f" Närmaste allmänna förbindelse är förbindelsebryggan"
+                                             f" vid {boatlink} som traffikeras av {boats_str}.")
+            pywikibot.output(f"{re.search(add, page.text).group()} -->{replacement}")
+            page.text, n = re.subn(add, replacement, page.text)
+            changes_made += n
+        # Push changes to wikipedia
+        if auto or (pywikibot.input("Continue Y/n: ") + 'y')[0].lower() == 'n':
+            return
+        page.save()
+
+        # Chagnes links to redirect pages to direct to main page instead.
+        pat = re.compile(f'^.*{re.escape(name)}.*$')
+        for p in page.backlinks():
+            hit = re.search(pat, p.text)
+            if hit:
+                if "OMDIRIGERING" in hit.group():
+                    for rp in p.backlinks():
+                        hit = re.search(re.escape(p.title()), rp.text)
+                        if hit and rp.namespace() == 0:
+                            pywikibot.output(f"<<< {rp.title()} >>>\n{hit.group()}  -->  {name}")
+                            rp.text, n = re.subn(re.escape(p.title()), name, rp.text)
+                            changes_made += n
+                            # Push changes to wikipedia
+                            page.save()
+        pywikibot.output(f"Made {changes_made} changes to {name}")
+
+
 def main(*args):
 
     local_args = pywikibot.handle_args(args)
@@ -74,6 +279,8 @@ def main(*args):
 
     site = pywikibot.Site()
 
+    remove_list = []
+    category_list = []
     if action == 'add-to-category':
         remove_list = specify_categories("Specify category to remove articles from:\n", site)
         category_list = specify_categories("Next category to add to:\n", site)
@@ -85,62 +292,17 @@ def main(*args):
     with open(sourcefile, 'r') as csvfile:
         pagereader = csv.reader(csvfile)
         for row in pagereader:
-            pywikibot.output(f"----- {row[0]} -------")
+            pywikibot.output(f"\n\n----- {row[0]} -------")
             if len(row) < 2:
                 pywikibot.output(f"Missing data from row, continuing...{len(row)}")
                 continue
             name, data, *_ = row
             try:
-                page = pywikibot.Page(site, name)
-                if not page.exists():
-                    pywikibot.output(f"Page {name} does not exist, skipping")
-                    continue
-                cats = page.categories()
-                pywikibot.output(f"categories: ,  {[x for x in cats]}")
-
-                if action == 'add-to-category':
-                    new_category = [c for c in category_list if data.lower() in
-                                    c.title().lower()]
-                    try:
-                        old_category = [c for c in remove_list if c in cats][0]
-                    except IndexError:
-                        pywikibot.output(f"Warning!! -- {name} does not belong to old category {remove_list}, skipping")
-                        continue
-                    if new_category and new_category[0] not in cats:
-                        pywikibot.output(f"Add to {new_category[0]}")
-                        if auto or (pywikibot.input("Confirm Y/n: ") + 'y')[0].lower() != 'n':
-                            # Add to new category
-                            new_text = pywikibot.textlib.replaceCategoryInPlace(page.text, old_category,
-                                                                                new_category[0], add_only=addonly)
-                            page.text = new_text
-                            page.save('Changed category')
-                            pywikibot.output(f"Adding to category {new_category}")
-
-                if action == 'rename':
-                    new_name = data
-                    new_page = pywikibot.page.Page(site, new_name)
-                    if page.isRedirectPage():
-                        pywikibot.output(f"!!!!!  Page {name} is only a redirect - skipping")
-                        continue
-                    if new_page.exists():
-                        pywikibot.output(f"!!!!!  Cannot move {name} to existing page {new_name}")
-                        continue
-                    pywikibot.output(f"Moving {name} ----> {new_name}")
-                    summary = 'Förenklar sidonamn baserat på ' \
-                              'https://sv.wikipedia.org/wiki/Wikipedia:Projekt_Fredrika/' \
-                              'Nagu_%C3%B6ar/Namnbytesf%C3%B6rslag'
-                    if auto or (pywikibot.input("Confirm Y/n: ") + 'y')[0].lower() != 'n':
-                        try:
-                            site.movepage(page, new_name, summary)
-                        except Exception as e:
-                            pywikibot.output(f"Could not move page {name}: {e}")
-                    else:
-                        pywikibot.output(f"Not moving page {name}")
-
-                if action == 'list':
-                    if auto or (pywikibot.input("Continue Y/n: ") + 'y')[0].lower() == 'n':
-                        break
-
+                edit_page(action, site, name, data,
+                          category_list=category_list,
+                          remove_list=remove_list,
+                          addonly=addonly,
+                          auto=auto)
             except Exception as e:
                 pywikibot.output(f"Error reading {name}:"
                                  f"{e}\n{traceback.format_exc()}")
