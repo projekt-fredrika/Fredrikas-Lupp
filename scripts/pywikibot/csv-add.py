@@ -135,7 +135,14 @@ def edit_page(action, site, name, data, category_list=(), remove_list=(), addonl
 
         # Calculate coords and names from data
         lat, lon, close, boat = data.split('|')
-        close_cords = pywikibot.page.Page(site, close).coordinates()[0]
+        try:
+            close_cords = pywikibot.page.Page(site, close).coordinates()[0]
+        except IndexError:
+            try:
+                close_cords = pywikibot.page.Page(site, close.split(', ')[0]).coordinates()[0]
+            except IndexError:
+                pywikibot.output("Cannot find close coords!!!!!")
+                return
         if " (" in close:
             closelink = f"[[{close}|{close.split(' (')[0]}]]"
             close = close.split(' (')[0]
@@ -154,94 +161,133 @@ def edit_page(action, site, name, data, category_list=(), remove_list=(), addonl
             boatlink = f"[[{boat}]]"
 
         boatnames = {
-            "M/S Eivor": ['Pärnäs', 'Berghamn', 'Nötö', 'Aspö', 'Jurmo', 'Utö'],
+            "M/S Eivor": ['Pärnäs', 'Nagu Berghamn', 'Nötö', 'Aspö', 'Jurmo', 'Utö'],
             "M/S Nordep": ['Kirjais', 'Brännskär', 'Stenskär', 'Gullkrona', 'Pensar',
-                           'Grötö', 'Kopparholm', 'Träskholm', 'Björkö', 'Trunsö', 'Sandholm', 'Lökholm', 'Borstö'],
-            "M/S Falkö": ['Nagu', 'Själö', 'Innamo', 'Järvsor', 'Maskinnamo', 'Åvensor'],
-            "M/S Östern": ['Nagu', 'Själö'],
-            "M/S Cheri": ['Pärnäs', 'Krok', 'Mattnäs', 'Lånholm', 'Fagerholm', 'Ängsö', 'Tveskiftsholm', 'Berghamn',
-                          'Hummelholm', 'Rockelholm', 'Ytterholm', 'Brännskär', 'Grötö', 'Stenskär', 'Gullkrona',
-                          'Kirjais']
+                           'Grötö', 'Kopparholm', 'Träskholm', 'Björkö', 'Trunsö',
+                           'Sandholm', 'Lökholm', 'Borstö', 'Knivskär', 'Bodö', 'Långholm och Träskholm'],
+            "M/S Falkö": ['Kyrkbacken, Nagu', 'Kyrkbacken', 'Själö', 'Innamo', 'Järvsor', 'Maskinnamo', 'Åvensor'],
+            "M/S Östern": ['Kyrkbacken, Nagu', 'Kyrkbacken', 'Själö'],
+            "M/S Cheri": ['Pärnäs', 'Krok', 'Mattnäs', 'Fagerholm', 'Ängsö', 'Tveskiftsholm',
+                          'Nagu Berghamn', 'Hummelholm', 'Östra Rockelholm', 'Ytterstholm', 'Brännskär', 'Grötö',
+                          'Stenskär', 'Gullkrona', 'Kirjais']
         }
 
+        old_text = page.text
+
         # Insert closest big island and Nagu in text
-        start = re.compile(r'(?<=\[\[ö \(landområde\)\|ö\]\]) i')
-        if re.search(start, page.text) and not re.search(r'\[\[Nagu\]\]', page.text):
+        start = re.compile(r'(?i)((?<=\[\[ö \(landområde\)\|ö\]\])|'
+                           r'(?<=\[\[öar\]\])|(?<=\[\[klippa \(geologi\)\|klippa\]\])|'
+                           r'(?<=\[\[klippor\]\])|'
+                           r'(?<=\[\[skär \(landområde\)\|skär\]\])|'
+                           r'(?<=\[\[ö \(landområde\)\|del av en ö\]\])) i')
+        if re.search(start, page.text) and not re.search(r'(?<!samhälle är )\[\[Nagu\]\]', page.text):
             replacement = f" nära {closelink} i [[Nagu]], "
+            if page.title().split(', ')[0] == close:
+                replacement = f" i [[Nagu]], "
             pywikibot.output(f"{re.search(start, page.text).group()} --> {replacement})")
             page.text, n = re.subn(start, replacement, page.text)
             changes_made += n
 
-        # Insert Nagu Kommundel in infobox
-        dist = re.compile(r'(?<=\| district)\s*=')
-        if re.search(dist, page.text):
-            pywikibot.output(f"{re.search(dist, page.text).group()} --> [[Nagu]]")
-            page.text, n = re.subn(dist, f"{' ' * 16}= [[Nagu]]", page.text)
+        # Simplify "i kommunen Pargas"
+        pargas_stad = re.compile(r'(och )?i kommunen \[\[(Pargas stad\|)?Pargas\]\]')
+        if re.search(pargas_stad, page.text):
+            replacement = f"i [[Pargas stad]]"
+            pywikibot.output(f"{re.search(pargas_stad, page.text).group()} --> {replacement}")
+            page.text, n = re.subn(pargas_stad, replacement, page.text)
             changes_made += n
 
-            distn = re.compile(r'(?<=\| district_type)\s*=')
-            if re.search(distn, page.text):
-                pywikibot.output(f"{re.search(distn, page.text).group()} --> [[Kommundel]]")
-                page.text, n = re.subn(distn, f"{' ' * 11}= [[Kommundel]]", page.text)
-                changes_made += n
-            else:
-                pywikibot.output(f"Saknade district_type")
-                page.text, n = re.subn(r'(?<= = \[\[Nagu\]\]$)',
-                                       f"| district_type{' ' * 11}= [[Kommundel]]",
-                                       page.text)
+        # Change Pargas to Pargas stad
+        pargas_muni = re.compile(r'(?<=\| municipality)\s*= \[\[(Pargas stad\|)?Pargas\]\]')
+        if re.search(pargas_muni, page.text):
+            replacement = f"{' ' * 12}= [[Pargas stad]]"
+            pywikibot.output(f"{re.search(pargas_muni, page.text).group()} --> {replacement}")
+            page.text, n = re.subn(pargas_muni, replacement, page.text)
+            changes_made += n
 
-        else:
-            # Insert whole | district = [[Nagu]]
-            pywikibot.output(f"Saknade district och district_type")
-            mun_pat = re.compile(r'(?=\| municipality )')
-            if re.search(mun_pat, page.text):
-                pywikibot.output(f"{re.search(mun_pat, page.text).group()}"
-                                 f" --> district=[[Nagu]] district_type=[[Kommundel]]")
-                page.text, n = re.subn(mun_pat, f"| district{' '*16}= [[Nagu]]\n"
-                                                f"| district_type{' '*11}= [[Kommundel]]\n", page.text)
-                changes_made += n
+        # Insert Nagu Kommundel in infobox as parish field
+        parish = re.compile(r'(?m)(?<=municipality_type {7}= \[\[Finlands kommuner\|Kommun\]\])|'
+                            r'(?<=municipality_type {7}= $)|'
+                            r'(?<=municipality_type {7}=$)')
+        if re.search(parish, page.text) and not re.search('parish', page.text):
+            replacement = (f"\n| parish{' ' * 18}= [[Nagu]]"
+                           f"\n| parish_type{' ' * 13}= Kommundel")
+            pywikibot.output(f"{re.search(parish, page.text).group()} --> {replacement}")
+            page.text, n = re.subn(parish, replacement, page.text)
+            changes_made += n
+            # Clear old district/district_type fields
+            page.text, n = re.subn(r'(?<=\| district {16}=) \[\[Nagu\]\]', '', page.text)
+            changes_made += n
+            page.text, n = re.subn(r'(?<=\| district_type {11}=) \[\[Kommundel\]\]', '', page.text)
+            changes_made += n
+
+        elif re.search(r'(?<== \[\[Pargas stad\|Pargas\]\])|'
+                       r'(?<== \[\[Pargas stad\]\])', page.text) and not re.search('parish', page.text):
+            pattern = re.compile(r'(?<== \[\[Pargas stad\|Pargas\]\])|'
+                                 r'(?<== \[\[Pargas stad\]\])')
+            replacement = (f"\n| parish{' ' * 18}= [[Nagu]]"
+                           f"\n| parish_type{' ' * 13}= Kommundel")
+            pywikibot.output(f"{re.search(pattern, page.text).group()} --> {replacement}")
+            page.text, n = re.subn(pattern, replacement, page.text)
+            changes_made += n
+            # Clear old district/district_type fields
+            page.text, n = re.subn(r'(?<=\| district {16}=) \[\[Nagu\]\]', '', page.text)
+            changes_made += n
+            page.text, n = re.subn(r'(?<=\| district_type {11}=) \[\[Kommundel\]\]', '', page.text)
+            changes_made += n
 
         # Insert distances to closest 1.big island, 2. Nagu kyrkbacken, 3. If missing: Åbo
-        distance = re.compile(r'(?<=Ön ligger omkring)')
+        distance = re.compile(r'((?<=Ön ligger)|(?<=Öarna ligger)) omkring ')
         no_abo = re.compile(r', i den (södra|sydvästra) delen av landet, ')
-        if re.search(distance, page.text):
+        if re.search(distance, page.text) and not re.search(r'om \[\[Nagu kyrka\]\]', page.text):
             close_dist, close_dir = distance_and_direction(close_cords.lat, close_cords.lon, lat, lon)
             kyrk_dist, kyrk_dir = distance_and_direction(60.194, 21.906, lat, lon)
-            replacement = (f" {close_dist:.0f} kilometer {close_dir} om {closelink}, "
-                           f"{kyrk_dist:.0f} kilometer {kyrk_dir} om [[Nagu kyrka]],")
+            close_str = 'just' if close_dist < 1 else f"omkring {close_dist:.0f} kilometer"
+            replacement = (f" {close_str} {close_dir} om {closelink}, "
+                           f"{kyrk_dist:.0f} kilometer {kyrk_dir} om [[Nagu kyrka]], ")
+            if page.title().split(', ')[0] == close:
+                replacement = f" {kyrk_dist:.0f} kilometer {kyrk_dir} om [[Nagu kyrka]], "
             pywikibot.output(f"{re.search(distance, page.text).group()} --> {replacement}")
             page.text, n = re.subn(distance, replacement, page.text)
             changes_made += n
-        elif re.search(no_abo, page.text):
+        elif re.search(no_abo, page.text) and not re.search(r'om \[\[Nagu kyrka\]\]', page.text):
             close_dist, close_dir = distance_and_direction(close_cords.lat, close_cords.lon, lat, lon)
             kyrk_dist, kyrk_dir = distance_and_direction(60.194, 21.906, lat, lon)
             abo_dist, abo_dir = distance_and_direction(60.4528, 22.2722, lat, lon)
-            replacement = (f". Ön ligger omkring {close_dist:.0f} kilometer {close_dir} om {closelink}, "
-                           f"omkring {kyrk_dist:.0f} kilometer {kyrk_dir} om [[Nagu kyrka]],"
+            close_str = 'just' if close_dist < 1 else f"omkring {close_dist:.0f} kilometer"
+            replacement = (f". Ön ligger {close_str} {close_dir} om {closelink}, "
+                           f"omkring {kyrk_dist:.0f} kilometer {kyrk_dir} om [[Nagu kyrka]], "
                            f" {abo_dist:.0f} kilometer {abo_dir} om Åbo och ")
+            if page.title().split(', ')[0] == close:
+                replacement = (f". Ön ligger omkring {kyrk_dist:.0f} kilometer {kyrk_dir} om [[Nagu kyrka]], "
+                               f" {abo_dist:.0f} kilometer {abo_dir} om Åbo och ")
             pywikibot.output(f"{re.search(no_abo, page.text).group()} --> {replacement}")
             page.text, n = re.subn(no_abo, replacement, page.text)
             changes_made += n
 
-        # Insert closest ferry location and waht boats traffic it at the end of intro text.
-        add = re.compile(r'om (huvudstaden )?\[\[Helsingfors\]\]\.')
-        if re.search(add, page.text) and close != name.split(', ')[0] and not re.search(r'förbindelse', page.text):
-            boats = [k for k, v in boatnames.items() if boat in v]
+        # Insert closest ferry location and what boats traffic it at the end of intro text.
+        add = re.compile(r'om (huvudstaden )?\[\[Helsingfors\]\]\.'
+                         r'( Närmaste allmänna förbindelse är förbindelsebryggan vid .*\[\[M\/S.{4,8}\]\]\.)?')
+        if re.search(add, page.text):  # and not re.search(r'förbindelse|trafikerar', page.text):
+            boats = [f"[[{k}]]" for k, v in boatnames.items() if boat in v]
             boats_plural = 'en' if len(boats) == 1 else 'arna'
             boats_str = ' och '.join(boats)
             replacement = 'om [[Helsingfors]].'
             if boat == name.split(', ')[0]:
-                replacement = replacement + f" Förbindelsebåt{boats_plural} {boats_str} traffikerar {name}."
+                replacement = replacement + f" Förbindelsebåt{boats_plural} {boats_str} trafikerar {name}."
             else:
                 replacement = replacement + (f" Närmaste allmänna förbindelse är förbindelsebryggan"
-                                             f" vid {boatlink} som traffikeras av {boats_str}.")
+                                             f" vid {boatlink} som trafikeras av {boats_str}.")
             pywikibot.output(f"{re.search(add, page.text).group()} -->{replacement}")
             page.text, n = re.subn(add, replacement, page.text)
             changes_made += n
         # Push changes to wikipedia
-        if auto or (pywikibot.input("Continue Y/n: ") + 'y')[0].lower() == 'n':
+        if changes_made == 0 or old_text == page.text:
             return
-        page.save()
+        elif ((auto and changes_made == 6) or (auto and changes_made == 3) or
+              (pywikibot.input(f"Continue with {changes_made} changes Y/n: ") + 'y')[0].lower() != 'n'):
+            page.save("Lägger till kommundel, avstånd och förbindelser")
+        else:
+            pywikibot.output(f"No changes made")
 
         # Chagnes links to redirect pages to direct to main page instead.
         pat = re.compile(f'^.*{re.escape(name)}.*$')
@@ -256,12 +302,11 @@ def edit_page(action, site, name, data, category_list=(), remove_list=(), addonl
                             rp.text, n = re.subn(re.escape(p.title()), name, rp.text)
                             changes_made += n
                             # Push changes to wikipedia
-                            page.save()
+                            rp.save("Ändrar länk att peka på rätt sida, inte redirect")
         pywikibot.output(f"Made {changes_made} changes to {name}")
 
 
 def main(*args):
-
     local_args = pywikibot.handle_args(args)
     arg_list = [x.split('=') for x in local_args]
     for arg in arg_list.copy():
