@@ -65,7 +65,7 @@ def loading_bar(loading, data=None):
 
 def make_dir(outdir_path):
     """Create new direcotory, unless it already exists"""
-    for path in list(reversed(outdir_path.parents)).append(outdir_path):
+    for path in list(reversed(outdir_path.parents)) + [outdir_path]:
         if not path.exists():
             path.mkdir()
 

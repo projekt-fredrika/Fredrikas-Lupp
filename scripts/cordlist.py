@@ -17,7 +17,7 @@ import csv
 from wikitools import wiki, api
 import requests
 
-CATEGORY_TITLE = 'Öar i Pargas'
+CATEGORY_TITLE = 'Öar i Nagu'
 WIKI_LANG = 'sv'
 INFOBOX_FILEDS = ['name', 'area', 'length', 'length_orientation',
                   'municipality', 'district']
