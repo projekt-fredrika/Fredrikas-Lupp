@@ -1194,16 +1194,18 @@ def save_as_html_graphic(d, e, api_fields, category):
             if max_pageviews < pv_sv:
                 max_pageviews = pv_sv
             row = td(url_title, cls="row-title")
-            relative_len_graph = graph(graph_bar(lang="fill", size=max_len - l_sv) +
-                                       graph_bar(lang="sv", size=l_sv), cls="relative")
+            relative_len_graph = graph(graph_bar(lang="sv", size=l_sv) +
+                                       graph_bar(lang="fill", size=max_len - l_sv),
+                                       cls="relative")
             row += td(relative_len_graph)
             len_graph = graph(graph_bar(lang="sv", size=l_sv) +
                               graph_bar(lang="fi", size=l_fi) +
                               graph_bar(lang="en", size=l_en) +
                               graph_bar(lang="de", size=l_de))
             row += td(len_graph)
-            relative_pv_graph = graph(graph_bar(lang="fill", size=max_pageviews - pv_sv) +
-                                      graph_bar(lang="sv", size=pv_sv), cls="relative")
+            relative_pv_graph = graph(graph_bar(lang="sv", size=pv_sv) +
+                                      graph_bar(lang="fill", size=max_pageviews - pv_sv),
+                                      cls="relative")
             row += td(relative_pv_graph)
             pv_graph = graph(graph_bar(lang="sv", size=pv_sv) +
                              graph_bar(lang="fi", size=pv_fi) +
@@ -1229,8 +1231,6 @@ def save_as_html_graphic(d, e, api_fields, category):
 
     dir_date = d['stats']['scrape_start'][:10]
     save_utf_file(f"visual_{category}.html", "html", h, dir_date=dir_date)
-
-
 
 
 def save_as_wikitext(d, e, api_fields, category, page_type='normal'):
