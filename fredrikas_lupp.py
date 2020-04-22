@@ -12,6 +12,7 @@ from datetime import datetime
 import sys
 import os.path
 import json
+import copy
 from pathlib import Path
 
 from lupp import scrape, html, plot, utils
@@ -124,6 +125,62 @@ Same as scrape, but only scrapes secondary language. Only for development use.
     utils.save_used_cache(jsonfile)
     scrape.save_as_html(d, e, api_fields, top_category)
     scrape.save_as_html_lang(d, e, api_fields, top_category)
+    utils.exit_program(start)
+
+if cmd == "scrape_list":
+    if top_category == 'help':
+        print('''
+Beep Boop
+        ''')
+    categories = []
+    success = []
+    tot = {}
+    with open(top_category) as f:
+        for line in f.readlines():
+            categories.append(line.strip())
+    for category in categories:
+        success.append(scrape.scrape_launch(d, e, sites, api_fields, max_depth,
+                                            blacklist, category,
+                                            languages))
+        if success:
+            tot[category] = d.deepcopy()
+        print("--------------------------------------", sum(success),
+              "--------------------------------------")
+    file_date = d['stats']['scrape_start'][:10]
+    utils.save_json_file(jsonfile, tot, dir_date=file_date)
+    utils.save_json_file(errfile, e, dir_date=file_date)
+    utils.save_used_cache(jsonfile)
+    scrape.save_as_html(d, e, api_fields, top_category)
+    scrape.save_as_html_lang(d, e, api_fields, top_category)
+
+    utils.exit_program(start)
+
+
+if cmd == "visual":
+    if top_category == 'help':
+        print('''
+Make visual report for existing json file and select it to use it for next commands.
+
+Usage: python3 fredrikas_lupp.py visual CATEGORY
+
+Example: python3 fredrikas_lupp.py visual Nagu
+
+Requires existing json file and does not request new data from any wiki. Analyzes data to create html
+file in html/DATE/ direcotry and selects this categry as to be used for next command.
+              ''')
+    json_exists = os.path.isfile(jsonfile)
+    if not json_exists:
+        print(f"Filen {jsonfile} saknas. Ett rent faktum. Tyrckfel?")
+        utils.exit_program(start)
+    d = json.load(open(jsonfile))
+
+    utils.save_used_cache(jsonfile)
+    scrape.save_as_html_graphic(d, e, api_fields, top_category)
+    print("---------------")
+    file_date = d['stats']['scrape_start'][:10]
+    utils.save_json_file(jsonfile, d, dir_date=file_date)
+    utils.save_json_file(errfile, e, dir_date=file_date)
+
     utils.exit_program(start)
 
 if cmd == "use":
@@ -309,6 +366,7 @@ Commands:
   THe list needs to be supplied as a text file named 'CATEGORY.txt'.
 
   use CATEGORY            Select existing josn file to analyze and use for next commands
+  visual CATEGORY         Select existing josn file and produce visual report for it
   contributors CATEGORY   Use existing josn file and analyze contributors for that file
   contributors_w CATEGORY Use existing josn file and analyze contributors for that file
   publish CATEGORY        Connect to mediawiki site and publish pages for CATEGORY

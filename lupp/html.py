@@ -16,9 +16,10 @@ def tr(text):
     return h
 
 
-def td(text):
+def td(text, cls=""):
+    cls = f' class="{cls}"' if cls else ""
     """Create <td> with text in it"""
-    h = f'<td>{text}</td>'
+    h = f'<td{cls}>{text}</td>'
     return h
 
 
@@ -65,6 +66,29 @@ def italic(text):
     return h
 
 
+def graph(text, cls=""):
+    """<div> element with class graph"""
+    h = f'<div class="graph {cls}">{text}</div>'
+    return h
+
+
+def graph_bar(text="", lang="fill", size=0):
+    """<div> element with class graph-bar for creating bars in graph"""
+    h = f'<div class="graph-bar {lang}" style="flex-grow: {size};">{text}</div>'
+    return h
+
+
+def action_box(levels, langs):
+    """Square icon"""
+    lang_boxes = [f'  <div class="action action{act_nr + 1} {lang}">{"!" * level}</div>' for
+                  act_nr, (level, lang)
+                  in enumerate(zip(levels, langs))]
+    h = (f'<div class="action-container">'
+         f'{"".join(lang_boxes)}'
+         f'</div>')
+    return h
+
+
 class HTML:
     """Class representing a HTML page as a string
 
@@ -104,11 +128,12 @@ class HTML:
     h1, h2, h3, h4 {{font-family: {self.text_font}; }}
     a {{text-decoration: none;}}
     p {{font-size: 10pt; orphans: 3; widows: 3;
-      margin-top: 0pt; margin-bottom: 0; padding-top: 0; line-height: 120%%;}}
+      margin-top: 0pt; margin-bottom: 0; padding-top: 0; line-height: 120%;}}
     h1 {{font-size: 16pt; margin: 3pt 0 20px 0;}}
     h1 {{font-size: 16pt; margin: 3pt 0 5pt 0;}}
     h2, h3, h4 {{margin: 2pt 0 1pt 0; padding: 2pt 0 0 2pt;}}
-    h2 {{font-size: 14pt; page-break-after: avoid; border-top: 0px solid black;}}
+    h2 {{font-size: 14pt; page-break-after: avoid; border-top: 0px solid black;
+    line-height: 14pt;}}
     h3 {{font-size: 12pt; border-top: 1px solid black;
         background-color: #8cba5c;}}
     h4 {{font-size: 10pt; border-top: 0px solid black;
@@ -122,10 +147,79 @@ class HTML:
     .ge_lightest_green {{background-color: #8cba5c;}}
     .ge_red {{background-color: #cf3a27;}}
     .ge_blue {{background-color: #4e6172;}}
-    .space {{line-height: 20%%;}}
+    .space {{line-height: 20%;}}
     .small {{font-size:11pt; font-weight:normal; }}
     .red {{color: #cf3a27;}}
     .lr_tag {{font-style: italic; font-size: 8pt; }}
+    .graph {{
+      display: flex;
+      flex-direction: row;
+      justify-content: flex-end;
+      border-radius: 3px;
+      border: 1px solid black;
+      padding: 0;
+      width: 8vw;
+    }}
+    .graph.relative {{
+      width: 20vw;
+      margin-left: 1em;
+    }}
+    .graph.legend {{
+        width: 50vw;
+        margin: auto;
+        margin-bottom: 3em;
+    }}
+    .graph-bar {{
+      display: block;
+      flex: 0 0;
+      text-align: center;
+      line-height: 2em;
+      height: 2em;
+    }}
+    .sv {{
+      background-color: #DB3218;
+      color: white;
+    }}
+    .fi {{
+      background-color: #103E66;
+      color: white;
+    }}
+    .en {{
+      background-color: #39A776;
+      color: black;
+    }}
+    .de {{
+      background-color: #FFCA1E;
+      color: black;
+    }}
+    .fill {{
+      background-color: white;
+    }}
+    .action-container {{
+      display: grid;
+      grid-template-columns: 8em 1fr;
+      grid-template-rows: 50px 1fr;
+      margin-left: 1em;
+    }}
+    .action {{
+      grid-area: 1 / 1 / 2 / 2;
+      border-radius: 3px;
+      height: 3em;
+      width: 3em;
+      margin: 0 0.2em;
+      text-align: center;
+      line-height: 3em;
+      box-shadow: 0 3px 6px rgba(0,0,0,0.16), 0 3px 6px rgba(0,0,0,0.23);
+    }}
+    .action2 {{
+      margin-left: 2.1em;
+    }}
+    .action3 {{
+      margin-left: 4.2em;
+    }}
+    .row-title {{
+        max-width: 10vw;
+    }}
     @media print {{.ge_red {{color: #cf3a27;}} .ge_blue {{color: #4e6172;}}}}
     @page {{margin: 0.9cm 0.5cm 0.7cm 0.5cm;}}
  </style>

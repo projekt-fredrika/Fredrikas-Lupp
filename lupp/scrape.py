@@ -78,6 +78,7 @@ from pathlib import Path
 from wikitools import exceptions, wiki, api, page
 
 from lupp.html import HTML, tr, th, thl, tdr, td, red, bold, italic
+from lupp.html import graph, graph_bar, action_box
 from lupp.utils import now_ymd_hms, days_between, loading_bar, save_utf_file, save_json_file
 from lupp.wikitext import table_start, align, cell, rowspan, colspan, w_red, w_bold, w_italic
 
@@ -1087,6 +1088,151 @@ def save_as_html_lang(d, e, api_fields, category):
     save_utf_file(f"l_{category}.html", "html", h, dir_date=dir_date)
 
 
+def save_as_html_graphic(d, e, api_fields, category):
+    """Create html file with colored graphs comparing length and views between
+    languages"""
+    html = HTML()
+    # try:
+    analyse_pagestats(d, e, api_fields)
+    analyse_time_interval(d, e)
+    analyse_langstats(d, e)
+    # except KeyError as ke:
+    #     e['error_analyze'] = {'info': ke.args, }
+    #     print(f'Kunde inte analysera, det fattas data från sidorna! Avbryter...')
+    #     return
+
+    stats = d['stats']
+    page_title = stats['category_title'].strip(".txt")
+    datum = stats['scraped'][:-3]
+    date_from = stats['date_from']
+    date_to = stats['date_to']
+    date_days = stats['pv_days']
+
+    desc = f"Wikipedia Page View Stats {datum} for the period {date_from}--{date_to} ({date_days} days)"
+
+    html.set_title_desc(page_title, desc)
+    h = html.doc_header()
+    h += graph(graph_bar(html.h2("Svenska"), "sv", 1) +
+               graph_bar(html.h2("Finska"), "fi", 1) +
+               graph_bar(html.h2("Engelska"), "en", 1) +
+               graph_bar(html.h2("Tyska"), "de", 1),
+              cls="legend")
+    h += html.start_table(column_count=6)
+
+    subh = (th("Artikel") + th("SV Längd") +
+           th("Längd") + th("SV Läsningar") +
+           th("Läsningar") + th("Förslag"))
+    subh = tr(subh)
+
+    l_categories = list(d['categories'])
+    l_categories.sort(key=lambda x: d['categories'][x]['order'])
+    i_cat = 0
+    for title in l_categories:
+        i_cat += 1
+        pages = d['categories'][title]['pages']
+        pl = []
+        max_len = 0
+        max_pageviews = 0
+        for p in pages:
+            if "sv" in p:
+                weight = (int(d['pages'][p]['stats'].get('pageviews_sv', 0)) + 1) * 100000
+            elif "fi" in p:
+                # removes duplicates with finnish names from list
+                other_langs = {}
+                for item in d['pages'][p]['langlinks']:
+                    other_langs.update(item)
+                if 'sv' in other_langs and f"{other_langs['sv']} (sv)" in d['pages']:
+                    continue
+                else:
+                    weight = int(d['pages'][p]['stats'].get('pageviews_fi', 0))
+            else:
+                print(f"Page {p} does not exist in sv or fi! Oh no!")
+                weight = 0
+
+            d['categories'][title]['pages'][p]['order'] = weight
+            pl.append({'title': p, 'weight': weight})
+
+        # skip empty categories
+        if not pl:
+            i_cat -= 1
+            continue
+
+        pl.sort(key=lambda x: x['weight'], reverse=True)
+        cls = ""
+        if '(sv)' not in title:
+            cls = 'red'
+        h += html.h2(f"{i_cat}. {title}", cls=cls)
+        h += subh
+        i_p = 0
+        for p_item in pl:
+            i_p += 1
+            p = p_item['title']
+            if p not in d['pages']:
+                continue
+            the_page = d['pages'][p]
+            stats = d['pages'][p]['stats']
+            short_title = the_page['title']
+            quality = stats['quality']
+
+            pv_sv = int(stats.get('pageviews_sv', 0))
+            pv_fi = int(stats.get('pageviews_fi', 0))
+            pv_en = int(stats.get('pageviews_en', 0))
+            pv_de = int(stats.get('pageviews_de', 0))
+
+            l_sv = int(stats.get('len_sv', 0))
+            l_fi = int(stats.get('len_fi', 0))
+            l_en = int(stats.get('len_en', 0))
+            l_de = int(stats.get('len_de', 0))
+
+            url_s = "<a href='https://{}.wikipedia.org/wiki/{}'>{}</a>"
+            url_lang = "fi" if l_sv == 0 else "sv"
+            url_title = url_s.format(url_lang, short_title, short_title)
+            url_title = italic(url_title) if l_sv == 0 else url_title
+
+            if max_len < l_sv:
+                max_len = l_sv
+            if max_pageviews < pv_sv:
+                max_pageviews = pv_sv
+            row = td(url_title, cls="row-title")
+            relative_len_graph = graph(graph_bar(lang="fill", size=max_len - l_sv) +
+                                       graph_bar(lang="sv", size=l_sv), cls="relative")
+            row += td(relative_len_graph)
+            len_graph = graph(graph_bar(lang="sv", size=l_sv) +
+                              graph_bar(lang="fi", size=l_fi) +
+                              graph_bar(lang="en", size=l_en) +
+                              graph_bar(lang="de", size=l_de))
+            row += td(len_graph)
+            relative_pv_graph = graph(graph_bar(lang="fill", size=max_pageviews - pv_sv) +
+                                      graph_bar(lang="sv", size=pv_sv), cls="relative")
+            row += td(relative_pv_graph)
+            pv_graph = graph(graph_bar(lang="sv", size=pv_sv) +
+                             graph_bar(lang="fi", size=pv_fi) +
+                             graph_bar(lang="en", size=pv_en) +
+                             graph_bar(lang="de", size=pv_de))
+            row += td(pv_graph)
+
+            box_levels = []
+            box_langs = []
+            for lang_name, lang_len in [('sv', l_sv),
+                                        ('fi', l_fi),
+                                        ('en', l_en),
+                                        ('de', l_de)]:
+                if lang_len == 0:
+                    box_levels.append(3)
+                    box_langs.append(lang_name)
+
+            row += td(action_box(box_levels, box_langs))
+            h += tr(row)
+
+    h += html.end_table()
+    h += html.doc_footer()
+
+    dir_date = d['stats']['scrape_start'][:10]
+    save_utf_file(f"visual_{category}.html", "html", h, dir_date=dir_date)
+
+
+
+
 def save_as_wikitext(d, e, api_fields, category, page_type='normal'):
     """Create table of all pages in category and save as wikitext markup file.
 
@@ -1168,7 +1314,7 @@ def save_as_wikitext(d, e, api_fields, category, page_type='normal'):
         pl.sort(key=lambda x: x['weight'], reverse=True)
 
         if page_type == 'top100':
-            pl = [x for x in pl if x['weight'] is not 0][:100]
+            pl = [x for x in pl if x['weight'] != 0][:100]
 
         if '(sv)' not in cat:
             cat = f"<span style='color:red'>{cat}</span>"
