@@ -1230,7 +1230,7 @@ def save_as_html_graphic(d, e, api_fields, category):
     h += html.doc_footer()
 
     dir_date = d['stats']['scrape_start'][:10]
-    save_utf_file(f"visual_{category}.html", "html", h, dir_date=dir_date)
+    save_utf_file(f"visual_{category}.html".replace(" ", "_"), "html", h, dir_date=dir_date)
 
 
 def save_as_wikitext(d, e, api_fields, category, page_type='normal'):
