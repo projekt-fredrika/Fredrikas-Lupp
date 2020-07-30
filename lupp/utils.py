@@ -34,6 +34,19 @@ def days_between(d1, d2):
 
 
 def loading_bar(loading, data=None):
+    try:
+        from ipywidgets import IntProgress, HTML, VBox
+        from IPython.display import display
+        try:
+            return loading_bar_ipython(loading, data)
+        except Error as e:
+            print(e)
+    except ImportError:
+        print("Using terminal loading bar")
+        return loading_bar_term(loading, data)
+
+
+def loading_bar_term(loading, data=None):
     """Prints loading bar that keeps repeating until loading['status'] is set to True
 
     Function that displays a loading bar that keeps repeating until
@@ -61,6 +74,36 @@ def loading_bar(loading, data=None):
             break
         i = (i + 1) % 10000
         time.sleep(0.001)
+
+
+def loading_bar_ipython(loading, data=None):
+    from ipywidgets import IntProgress, HTML, VBox
+    from IPython.display import display
+    progress = IntProgress(min=0, max=100, value=0)
+    progress.bar_style='info'
+
+    label = HTML()
+    box = VBox(children=[label, progress])
+    display(box)
+
+    page_cnt = 0
+    shown_categories = set()
+    while True:
+        if data and 'pages'in data:
+            page_cnt = len(data['pages'])
+        if data and 'categories' in data:
+            new_cats = set(data['categories'].keys())
+            for new in new_cats.difference(shown_categories):
+                print(f"\rCategory title: {new}")
+            shown_categories = new_cats
+        label.value = f'Pages: {page_cnt} / ?'
+        progress.value = page_cnt % 95
+        if not loading['status']:
+            label.value = f'Pages: {page_cnt} / {page_cnt}'
+            progress.value = 100
+            print(f"Scraping Done! {page_cnt} pages read")
+            break
+        time.sleep(0.5)
 
 
 def make_dir(outdir_path):
