@@ -80,7 +80,8 @@ def graph_bar(text="", lang="fill", size=0):
 
 def action_box(levels, langs):
     """Square icon"""
-    lang_boxes = [f'  <div class="action action{act_nr + 1} {lang}">{"!" * level}</div>' for
+    lang_boxes = [f'  <div class="action action{act_nr + 1}'
+                  f' {lang}">{bold("!" * level)}</div>' for
                   act_nr, (level, lang)
                   in enumerate(zip(levels, langs))]
     h = (f'<div class="action-container">'
@@ -210,12 +211,19 @@ class HTML:
       text-align: center;
       line-height: 3em;
       box-shadow: 0 3px 6px rgba(0,0,0,0.16), 0 3px 6px rgba(0,0,0,0.23);
+      z-index: 0;
     }}
     .action2 {{
       margin-left: 2.1em;
+      z-index: -1;
     }}
     .action3 {{
       margin-left: 4.2em;
+      z-index: -2;
+    }}
+    .action4 {{
+      margin-left: 6.3em;
+      z-index: -3;
     }}
     .row-title {{
         max-width: 10vw;

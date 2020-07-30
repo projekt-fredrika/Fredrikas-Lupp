@@ -1213,16 +1213,28 @@ def save_as_html_graphic(d, e, api_fields, category):
                              graph_bar(lang="de", size=pv_de))
             row += td(pv_graph)
 
-            box_levels = []
-            box_langs = []
-            for lang_name, lang_len in [('sv', l_sv),
-                                        ('fi', l_fi),
-                                        ('en', l_en),
-                                        ('de', l_de)]:
-                if lang_len == 0:
-                    box_levels.append(3)
-                    box_langs.append(lang_name)
+            # Rules for attention boxes
+            boxes = {}
+            for lang_name, lang_len, lang_pv in [('sv', l_sv, pv_sv),
+                                                 ('fi', l_fi, pv_fi),
+                                                 ('en', l_en, pv_en),
+                                                 ('de', l_de, pv_de)]:
+                # 1. language under 10% of swedish
+                if lang_len < l_sv * 0.1 and pv_sv > 5:
+                    boxes[lang_name] = 1
 
+                # 2. Read a lot but comparatively  short
+                if lang_pv * 5 > lang_len and pv_sv > 5:
+                    boxes[lang_name] = 2
+
+                # 3. language missing totally
+                if lang_len == 0 and (pv_sv > 5 or lang_name == "sv"):
+                    boxes[lang_name] = 3
+                    # box_levels.append(3)
+                    # box_langs.append(lang_name)
+
+            boxes = sorted(boxes.items(), key=lambda x: x[1])
+            box_langs, box_levels = list(zip(*boxes)) if boxes else ([], [])
             row += td(action_box(box_levels, box_langs))
             h += tr(row)
 
