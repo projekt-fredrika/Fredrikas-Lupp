@@ -130,6 +130,20 @@ def save_utf_file(utf_file, fmt, s, dir_date=""):
         f.write(s)
         print(f"Skapade {fmt}-filen {utf_file} ({len(s)} tecken)")
 
+def get_utf_file(utf_file, fmt, dir_date=""):
+    """Gets an open file
+
+    Gets an open file in a folder based on format and date.
+    All formats are saved in different folders with subfolders for different dates.
+    :param utf_file: Name of category/list of the data
+    :param fmt: What format the data is in, also specifies where file is saved
+    :param dir_date: Specifies subfolder where file is to be saved. If empty, current date is used
+    """
+    path = Path('.') / fmt / dir_date
+    make_dir(path)
+    utf_file = path / utf_file
+    return open(utf_file, "w", encoding='utf-8')
+
 
 def save_json_file(json_file, j, dir_date=""):
     """Save python dict as json file
