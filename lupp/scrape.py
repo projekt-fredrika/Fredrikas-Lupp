@@ -1204,7 +1204,7 @@ def save_as_html_lang(d, e, api_fields, category):
     langs = {}
     pages = d['pages']
     for p in pages:
-        lang = p.split("(")[1].strip(")")
+        lang = p.split("(")[-1].strip(")")
         # language is at end, eg. (de), but the page title itself may contain parentheses
         #  that do not refer to language - skip those!
         is_a_lang = len(lang) < 4 or lang == "simple"
@@ -1218,13 +1218,11 @@ def save_as_html_lang(d, e, api_fields, category):
             if pv is not None:
                 langs[lang] += pv
     print(f"languages, unsorted {langs}")
-    sorted_langs = [(k, langs[k]) for k in sorted(langs, key=langs.get, reverse=True)]
-    print(f"languages, sorted {sorted_langs}")
     h += html.start_table(column_count=13)
 
     subh1 = th("No") + thl("Article")
-    for l in sorted_langs:
-        subh1 += th(l[0])
+    for l in langs:
+        subh1 += th(l)
     subh1 = tr(subh1)
 
     l_categories = list(d['categories'])
@@ -1233,32 +1231,32 @@ def save_as_html_lang(d, e, api_fields, category):
     for title in l_categories:
         print(f"Overall title {title}")
         i_cat += 1
-        en_pages = d['categories'][title]['pages']
+        pages = d['categories'][title]['pages']
 
         cls = ""
         h += subh1
         i_p = 0
         url_s = "<a href='https://{}.wikipedia.org/wiki/{}'>{}</a>"
-        for en_page in en_pages:
-            if en_page not in d['pages']:
+        for page in pages:
+            if page not in d['pages']:
                 continue
-            en_title = d['pages'][en_page]['title']
-            en_pv = d['pages'][en_page]['stats']['pageviews_tot']
-            url_en = url_s.format("en", en_title, en_title)
-            url_en_pv = url_s.format("en", en_title, en_pv)
+            lang = page.split("(")[-1].strip(")")
+            title = d['pages'][page]['title']
+            pv = d['pages'][page]['stats']['pageviews_tot']
+            url = url_s.format(lang, title, title)
+            url_pv = url_s.format(lang, title, pv)
             lang_dict = {}
-            for k in d['pages'][en_page]['langlinks']:
+            for k in d['pages'][page]['langlinks']:
                 lang_dict[list(k)[0]] = k[list(k)[0]]
-            # print(f"== en_page = {en_page} title {en_title} dict {lang_dict}")
+            # print(f"== page = {page} title {title} dict {lang_dict}")
             i_p += 1
-            row = tdr(i_p) + td(url_en) + tdr(url_en_pv)
-            for lang_pair in sorted_langs:
-                # print(f"pair {lang_pair}")
-                lang_column = lang_pair[0]
-                if lang_column == "en":
+            row = tdr(i_p) + td(url)
+            for lang_column in langs:
+                if lang_column == lang:
+                    row += tdr(url_pv)
                     continue
                 cell = ""
-                if 'langlinks' in d['pages'][en_page]:
+                if 'langlinks' in d['pages'][page]:
                     has_lang = lang_column in lang_dict
                     if has_lang:
                         page_in_lang = lang_dict[lang_column] + " (" + lang_column + ")"
