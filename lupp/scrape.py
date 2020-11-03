@@ -83,6 +83,7 @@ from lupp.html import HTML, tr, th, thl, tdr, td, red, bold, italic
 from lupp.html import graph, graph_bar, action_box
 from lupp.utils import now_ymd_hms, days_between, loading_bar, save_utf_file, save_json_file, get_utf_file
 from lupp.wikitext import table_start, align, cell, rowspan, colspan, w_red, w_bold, w_italic
+from functools import cmp_to_key
 
 
 def scrape_launch(d, e, sites, api_fields, max_depth, blacklist, category_title, languages="sv|fi|en|de"):
@@ -680,6 +681,7 @@ def analyse_pagestats(d, e, api_fields):
                            3 * points('redirects_cnt') + \
                            1 * points('contributors_tot')
 
+        stats['pageviews_tot'] = str(count['pageviews'])
         if "(sv)" in p:
             stats['pageviews_sv'] = str(count['pageviews'])
             stats['len_sv'] = d['pages'][p]['length']
@@ -688,7 +690,6 @@ def analyse_pagestats(d, e, api_fields):
             stats['pageviews_fi'] = str(count['pageviews'])
             stats['len_fi'] = d['pages'][p]['length']
             lang_stats['fi'] = copy.deepcopy(stats)
-        stats['pageviews_tot'] = str(count['pageviews'])
 
 
 def analyse_langstats(d, e):
@@ -1233,13 +1234,28 @@ def save_as_html_lang(d, e, api_fields, category):
         i_cat += 1
         pages = d['categories'][title]['pages']
 
+        sorted_pages = {}
+        for page in pages:
+            if page not in d['pages']:
+                continue
+            sorted_pages[page] = d['pages'][page]
+        def comparer(left, right):
+            for lang_column in langs:
+                l_stats = sorted_pages[left]['lang_stats'].get(lang_column, {})
+                l = int(l_stats.get('pageviews_tot', 0))
+                r_stats = sorted_pages[right]['lang_stats'].get(lang_column, {})
+                r = int(r_stats.get('pageviews_tot', 0))
+                t =  r - l
+                if t:
+                    return t
+            return 0
+        sorted_pages = sorted(sorted_pages, key=cmp_to_key(comparer))
+
         cls = ""
         h += subh1
         i_p = 0
         url_s = "<a href='https://{}.wikipedia.org/wiki/{}'>{}</a>"
-        for page in pages:
-            if page not in d['pages']:
-                continue
+        for page in sorted_pages:
             lang = page.split("(")[-1].strip(")")
             title = d['pages'][page]['title']
             pv = d['pages'][page]['stats']['pageviews_tot']
