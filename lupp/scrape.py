@@ -779,7 +779,9 @@ def analyse_and_save_contributors(d, e, category, fmt='html'):
     page_title = stats['category_title']
     page_title = f"{page_title}: {c_contrib} wikipedianer, {c_title} artiklar, {c_item} w x a"
     datum = d['stats']['scrape_start'][:10]
-    desc = f"Användarstatistik för tidsperioden {1}-{2}, körd {datum}"
+    date_from = stats['date_from']
+    date_to = stats['date_to']
+    desc = f"Användarstatistik för tidsperioden {date_from}--{date_to}, körd {datum}"
 
     if fmt == 'html':
         html.set_title_desc(page_title, desc)
