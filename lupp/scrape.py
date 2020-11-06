@@ -1252,6 +1252,7 @@ def save_as_html_lang(d, e, api_fields, category):
         sorted_pages = sorted(sorted_pages, key=cmp_to_key(comparer))
 
         cls = ""
+        h += html.h2(f"{i_cat}. {title}", cls=cls)
         h += subh1
         i_p = 0
         url_s = "<a href='https://{}.wikipedia.org/wiki/{}'>{}</a>"
