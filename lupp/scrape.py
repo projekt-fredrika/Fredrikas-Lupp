@@ -1505,7 +1505,7 @@ def publish(d, e, api_fields, category, subpages=True):
     else:
         site = wiki.Wiki(os.environ['WIKISITE'])
     if 'WIKIUSER' not in os.environ or 'WIKIPASSWORD' not in os.environ:
-        site = wiki.Wiki("https://projektfredrika.fi/api.php")
+        # site = wiki.Wiki("https://projektfredrika.fi/api.php")
         user = input("Login name:")
         site.login(user)
     else:
