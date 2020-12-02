@@ -747,44 +747,55 @@ def analyse_and_save_contributors(d, e, category, fmt='html'):
     c_title = c_item = 0
     for title in l:
         c_title += 1
+        lang = title.split("(")[-1].strip(")")
         l2 = d['pages'][title]['contributors']
         for item in l2:
             c_item += 1
             if item in user_stat:
-                user_stat[item] += 1
+                user_stat[item]['edits'] += 1
             else:
-                user_stat[item] = 1
-    l_user_stat = list(user_stat)
-    c_contrib = len(l_user_stat)
-    o_user_stat = []
-    for item in l_user_stat:
-        o_user_stat.append({'user': item, 'edits': user_stat[item]})
-    if len(o_user_stat) > 1000:
-        o_user_stat = [u for u in o_user_stat if u['edits'] > 5]
-    o_user_stat.sort(key=lambda x: x['edits'], reverse=True)
-    o_bot_stat = []
-    o_real_user_stat = []
-    for u in o_user_stat:
-        if u['user'][-3:].lower() == 'bot':
-            o_bot_stat.append(u)
-        else:
-            o_real_user_stat.append(u)
+                user_stat[item] = {}
+                user_stat[item]['edits'] = 1
+            if lang in user_stat[item]:
+                user_stat[item][lang] += 1
+            else:
+                user_stat[item][lang] = 1
+    c_contrib = len(user_stat)
+    if len(user_stat) > 1000:
+        user_stat = {k: v for k, v in user_stat.items() if v['edits'] > 5}
+    langs = d['stats']['languages'].split("|")
+    def comparer(left, right):
+        for lang_column in langs:
+            l = user_stat[left].get(lang_column, 0)
+            r = user_stat[right].get(lang_column, 0)
+            t =  r - l
+            if t:
+                return t
+        return 0
+    user_sorted = sorted(user_stat, key=cmp_to_key(comparer))
 
     stats = d['stats']
     page_title = stats['category_title']
     page_title = f"{page_title}: {c_contrib} wikipedianer, {c_title} artiklar, {c_item} w x a"
     datum = d['stats']['scrape_start'][:10]
-    desc = f"Användarstatistik för tidsperioden {1}-{2}, körd {datum}"
+    date_from = stats['date_from']
+    date_to = stats['date_to']
+    desc = f"Användarstatistik för tidsperioden {date_from}--{date_to}, körd {datum}"
 
     if fmt == 'html':
         html.set_title_desc(page_title, desc)
         h = html.doc_header()
         h += html.start_table(column_count=3)
-        h += tr(th("Nr") + thl("Wikipedian") + th("Artiklar"))
+        h += th("Nr") + thl("Wikipedian")
+        for lang in langs:
+            h += th(lang)
+        h = tr(h)
 
     elif fmt == 'wikitext':
         h = f"= {page_title} = \n\n\n{desc}\n\n\n"
-        h1 = ['Nr', 'Wikipedian', 'Artiklar']
+        h1 = ['Nr', 'Wikipedian']
+        for lang in langs:
+            h1.append(lang)
         h += table_start(h1, [])
 
     else:
@@ -792,20 +803,20 @@ def analyse_and_save_contributors(d, e, category, fmt='html'):
         h = ""
 
     i = 0
-    for item in o_user_stat:
+    for user in user_sorted:
         i += 1
 
-        user = item['user']
         user_page = f"https://sv.wikipedia.org/wiki/Användare:{user}"
         disc_page = f"https://sv.wikipedia.org/wiki/Användardiskussion:{user}"
-        contrib_page = f"https://sv.wikipedia.org/wiki/Special:Bidrag/{user}"
 
         if fmt == 'html':
             a_href = "<a href='{}'>{}</a>"
 
             row = tdr(a_href.format(disc_page, i))
             row += td(a_href.format(user_page, user))
-            row += tdr(a_href.format(contrib_page, item['edits']))
+            for lang in langs:
+                contrib_page = f"https://{lang}.wikipedia.org/wiki/Special:Contributions/{user}"
+                row += tdr(a_href.format(contrib_page, user_stat[user].get(lang, 0)))
 
             h += tr(row)
 
@@ -813,7 +824,9 @@ def analyse_and_save_contributors(d, e, category, fmt='html'):
             a_href = "[{} {}]"
             row = align(a_href.format(disc_page.replace(' ', '&nbsp;'), i))
             row += cell(a_href.format(user_page.replace(' ', '&nbsp;'), user))
-            row += align(a_href.format(contrib_page.replace(' ', '&nbsp;'), item['edits']))
+            for lang in langs:
+                contrib_page = f"https://{lang}.wikipedia.org/wiki/Special:Contributions/{user}"
+                row += align(a_href.format(contrib_page.replace(' ', '&nbsp;'), user_stat[user].get(lang, 0)))
 
             h += f"{row}|-\n"
 
