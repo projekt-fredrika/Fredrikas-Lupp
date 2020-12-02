@@ -69,9 +69,11 @@ Also contains some utility functions for dealing with publishing the result of a
 """
 
 import codecs
+import csv
 import os
 import sys
 import concurrent.futures
+import copy
 from datetime import datetime
 from pathlib import Path
 
@@ -79,8 +81,9 @@ from wikitools import exceptions, wiki, api, page
 
 from lupp.html import HTML, tr, th, thl, tdr, td, red, bold, italic
 from lupp.html import graph, graph_bar, action_box
-from lupp.utils import now_ymd_hms, days_between, loading_bar, save_utf_file, save_json_file
+from lupp.utils import now_ymd_hms, days_between, loading_bar, save_utf_file, save_json_file, get_utf_file
 from lupp.wikitext import table_start, align, cell, rowspan, colspan, w_red, w_bold, w_italic
+from functools import cmp_to_key
 
 
 def scrape_launch(d, e, sites, api_fields, max_depth, blacklist, category_title, languages="sv|fi|en|de"):
@@ -244,7 +247,7 @@ def _scrape_category(d, e, max_depth, sites, blacklist, api_fields,
     request = api.APIRequest(site, params)
     p_to_scrape = {}
     for language in d['stats']['languages'].split('|'):
-        p_to_scrape.update({language: [], f"{language}q": []})
+        p_to_scrape.update({language: []})
     # Create batches of results on top-level category
     for result in request.queryGen():  # async_gen(request.queryGen):
         pages = result['query']['categorymembers']
@@ -282,22 +285,13 @@ def _scrape_category(d, e, max_depth, sites, blacklist, api_fields,
                     print(f"wikitools API-fel {we.args}")
                     pass
             else:
-                quickscan = add_to_category is not None
-                if quickscan:
-                    p_to_scrape[lang + 'q'] += [title]
-                else:
-                    p_to_scrape[lang] += [title]
+                p_to_scrape[lang] += [title]
     for b_l in p_to_scrape:
         batch = p_to_scrape[b_l]
-        if b_l[-1] == 'q':
-            quickscan = True
-            b_l = b_l[:-1]
-        else:
-            quickscan = False
         # cut batch size to 50
         for i in range(0, len(batch), 50):
             batch_string = '|'.join(batch[i:i + 50])
-            tpe.submit(_scrape_pages, d, e, api_fields, batch_string, b_l, is_category=False, quickscan=quickscan)
+            tpe.submit(_scrape_pages, d, e, api_fields, batch_string, b_l, is_category=False, quickscan=False)
 
 
 def _scrape_article_list(d, e, sites, api_fields, filename, lang="en"):
@@ -577,7 +571,7 @@ def _scrape_lang(d, e, api_fields, langs, primary_lang, tpe=None):
             # cut batch size to 50 to retrieve 50 pages at a time from the API
             for i in range(0, len(batch), 50):
                 batch_string = '|'.join(batch[i:i + 50])
-                tpe.submit(_scrape_pages, d, e, api_fields, batch_string, b_l, is_category, quickscan=True)
+                tpe.submit(_scrape_pages, d, e, api_fields, batch_string, b_l, is_category, quickscan=False)
 
 
 def _scrape_missing_primary_language(d, e, max_depth, sites, blacklist, api_fields, tpe=None):
@@ -647,7 +641,9 @@ def analyse_pagestats(d, e, api_fields):
     l_pages = list(d['pages'])
     for p in l_pages:
         d['pages'][p]['stats'] = {}
+        d['pages'][p]['lang_stats'] = {}
         stats = d['pages'][p]['stats']
+        lang_stats = d['pages'][p]['lang_stats']
         anon = int(d['pages'][p].get('anoncontributors', 0))
         known = len(d['pages'][p]['contributors'])
         stats['contributors_tot'] = str(anon + known)
@@ -684,13 +680,16 @@ def analyse_pagestats(d, e, api_fields):
                            2 * points('extlinks_cnt') + \
                            3 * points('redirects_cnt') + \
                            1 * points('contributors_tot')
+
+        stats['pageviews_tot'] = str(count['pageviews'])
         if "(sv)" in p:
             stats['pageviews_sv'] = str(count['pageviews'])
             stats['len_sv'] = d['pages'][p]['length']
+            lang_stats['sv'] = copy.deepcopy(stats)
         elif "(fi)" in p:
             stats['pageviews_fi'] = str(count['pageviews'])
             stats['len_fi'] = d['pages'][p]['length']
-        stats['pageviews_tot'] = str(count['pageviews'])
+            lang_stats['fi'] = copy.deepcopy(stats)
 
 
 def analyse_langstats(d, e):
@@ -715,6 +714,7 @@ def analyse_langstats(d, e):
                     # -print(f"p {p} pv {pv_in_lang} l {l_in_lang}")
                     d['pages'][p]['stats']["pageviews_" + l] = pv_in_lang
                     d['pages'][p]['stats']["len_" + l] = l_in_lang
+                    d['pages'][p]["lang_stats"][l] = copy.deepcopy(d['pages'][p_in_lang]['stats'])
 
 
 def analyse_time_interval(d, e):
@@ -987,6 +987,195 @@ def save_as_html(d, e, api_fields, category):
     dir_date = d['stats']['scrape_start'][:10]
     save_utf_file(f"c_{category}.html", "html", h, dir_date=dir_date)
 
+def save_as_csv(d, e, api_fields, category, need_analyse=False):
+    """Create csv table of category and save as csv file."""
+    if need_analyse:
+        html = HTML()
+        try:
+            analyse_pagestats(d, e, api_fields)
+            analyse_time_interval(d, e)
+            analyse_langstats(d, e)
+        except KeyError as ke:
+            e['error_analyze'] = {'info': ke.args, }
+            print('Cound not analyze, the pages are missing data, canceling...')
+            return
+
+    stats = d['stats']
+    page_title = stats['category_title']
+    datum = stats['scraped'][:-3]
+    date_from = stats['date_from']
+    date_to = stats['date_to']
+    date_days = stats['pv_days']
+
+    dir_date = d['stats']['scrape_start'][:10]
+    filename = f"c_{category}_{date_from}--{date_to}_{date_days}.csv"
+    with get_utf_file(filename, "csv", dir_date=dir_date) as f:
+        w = csv.writer(f, delimiter=';')
+
+        subh1 = [""] * 2 + ["Svenska"] + [""] * 4 + ["Finska", "", "Engelska", \
+                 "", "Tyska"] + [""] * 2 + ["Svenska"] + [""] * 7 +            \
+                 ["Finska"] + [""] * 7 + ["Engelska"] + [""] * 7 + ["Tyska"] + \
+                 [""] * 7
+        subh2 = ["Nr", "Artikel", "Visat", "% av fi", u"Längd", "% av fi",     \
+                 "Kvalitet", "Visat", u"Längd", "Visat", u"Längd", "Visat",    \
+                 u"Längd", "Språk(Totalt)"] + ["Kategorier", "Bilder",         \
+                 "Länkar till WP", "Länkar från WP", "Länkar ut", "Aliasar",   \
+                 "Redaktörer", "Editeringa"] * 4
+
+        l_categories = list(d['categories'])
+        l_categories.sort(key=lambda x: d['categories'][x]['order'])
+        i_cat = 0
+        for title in l_categories:
+            i_cat += 1
+            pages = d['categories'][title]['pages']
+            pl = []
+            for p in pages:
+                if "sv" in p:
+                    pstats = d['pages'][p]['stats']
+                    weight = (int(pstats.get('pageviews_sv', 0)) + 1) * 100000
+                elif "fi" in p:
+                    # removes duplicates with finnish names from list
+                    other_langs = {}
+                    for item in d['pages'][p]['langlinks']:
+                        other_langs.update(item)
+                    if 'sv' in other_langs and \
+                       f"{other_langs['sv']} (sv)" in d['pages']:
+                        continue
+                    else:
+                        pstats = d['pages'][p]['stats']
+                        weight = int(pstats.get('pageviews_fi', 0))
+                else:
+                    print(f"Page {p} does not exist in sv or fi! Oh no!")
+                    weight = 0
+                # print("weight %s" % weight)
+
+                d['categories'][title]['pages'][p]['order'] = weight
+                pl.append({'title': p, 'weight': weight})
+            # -print("pl ----")
+            # -pprint(pl)
+
+            # skip empty categories
+            if not pl:
+                i_cat -= 1
+                continue
+
+            pl.sort(key=lambda x: x['weight'], reverse=True)
+            w.writerow([f"{i_cat}.", f"{title}"] + [""] * 44)
+            w.writerow(subh1)
+            w.writerow(subh2)
+            i_p = 0
+            for p_item in pl:
+                i_p += 1
+                p = p_item['title']
+                if p not in d['pages']:
+                    continue
+                the_page = d['pages'][p]
+                stats = d['pages'][p]['stats']
+                lang_stats = d['pages'][p]['lang_stats']
+                short_title = the_page['title']
+                quality = stats['quality']
+                total_langs = int(stats['total_langs']) + 1
+
+                pv_sv = int(stats.get('pageviews_sv', 0))
+                pv_fi = int(stats.get('pageviews_fi', 0))
+                pv_en = int(stats.get('pageviews_en', 0))
+                pv_de = int(stats.get('pageviews_de', 0))
+
+                l_sv = int(stats.get('len_sv', 0))
+                l_fi = int(stats.get('len_fi', 0))
+                l_en = int(stats.get('len_en', 0))
+                l_de = int(stats.get('len_de', 0))
+
+                sv_stats = lang_stats.get('sv', {})
+                categories_sv = int(sv_stats.get('categories_cnt', 0))
+                images_sv = int(sv_stats.get('images_cnt', 0))
+                links_sv = int(sv_stats.get('links_cnt', 0))
+                linkshere_sv = int(sv_stats.get('linkshere_cnt', 0))
+                extlinks_sv = int(sv_stats.get('extlinks_cnt', 0))
+                redirects_sv = int(sv_stats.get('redirects_cnt', 0))
+                contributors_sv = int(sv_stats.get('contributors_cnt', 0))
+                revisions_cnt_sv = int(sv_stats.get('revisions_cnt', 0))
+
+                fi_stats = lang_stats.get('fi', {})
+                categories_fi = int(fi_stats.get('categories_cnt', 0))
+                images_fi = int(fi_stats.get('images_cnt', 0))
+                links_fi = int(fi_stats.get('links_cnt', 0))
+                linkshere_fi = int(fi_stats.get('linkshere_cnt', 0))
+                extlinks_fi = int(fi_stats.get('extlinks_cnt', 0))
+                redirects_fi = int(fi_stats.get('redirects_cnt', 0))
+                contributors_fi = int(fi_stats.get('contributors_cnt', 0))
+                revisions_cnt_fi = int(fi_stats.get('revisions_cnt', 0))
+
+                en_stats = lang_stats.get('en', {})
+                categories_en = int(en_stats.get('categories_cnt', 0))
+                images_en = int(en_stats.get('images_cnt', 0))
+                links_en = int(en_stats.get('links_cnt', 0))
+                linkshere_en = int(en_stats.get('linkshere_cnt', 0))
+                extlinks_en = int(en_stats.get('extlinks_cnt', 0))
+                redirects_en = int(en_stats.get('redirects_cnt', 0))
+                contributors_en = int(en_stats.get('contributors_cnt', 0))
+                revisions_cnt_en = int(en_stats.get('revisions_cnt', 0))
+
+                de_stats = lang_stats.get('de', {})
+                categories_de = int(de_stats.get('categories_cnt', 0))
+                images_de = int(de_stats.get('images_cnt', 0))
+                links_de = int(de_stats.get('links_cnt', 0))
+                linkshere_de = int(de_stats.get('linkshere_cnt', 0))
+                extlinks_de = int(de_stats.get('extlinks_cnt', 0))
+                redirects_de = int(de_stats.get('redirects_cnt', 0))
+                contributors_de = int(de_stats.get('contributors_cnt', 0))
+                revisions_cnt_de = int(de_stats.get('revisions_cnt', 0))
+
+                # % of sv length in relation to fi
+                pct_l = 0 if l_fi == 0 else 100 * l_sv / l_fi
+                sp_l = "*" if l_fi == 0 else f'{pct_l:.0f}' + "%"
+                sp_l = "" if l_sv == 0 else str(sp_l)
+
+                # % of sv pageviews in relation to fi
+                pct_pv = 0 if pv_fi == 0 else 100 * pv_sv / pv_fi
+                sp_pv = "*" if pv_fi == 0 else f'{pct_pv:.0f}' + "%"
+                sp_pv = "" if l_sv == 0 else str(sp_pv)
+
+                s_pv = "" if pv_sv == 0 else str(pv_sv)
+                s_length = "-" if l_sv == 0 else str(l_sv)
+
+                p_fi = p_en = p_de = ""
+                if 'langlinks' in d['pages'][p]:
+                    ll = d['pages'][p]['langlinks']
+                    for item in ll:
+                        lang = list(item)[0]
+                        if lang == 'fi':
+                            p_fi = item['fi']
+                        if lang == 'en':
+                            p_en = item['en']
+                        if lang == 'de':
+                            p_de = item['de']
+
+                url_fi = "-" if p_fi == "" else str(pv_fi)
+                url_en = "-" if p_en == "" else str(pv_en)
+                url_de = "-" if p_de == "" else str(pv_de)
+
+                if p_fi == "":
+                    l_fi = "-"
+                if p_en == "":
+                    l_en = "-"
+                if p_de == "":
+                    l_de = "-"
+
+                w.writerow([i_p, short_title, s_pv, sp_pv, s_length, sp_l,     \
+                            quality, url_fi, l_fi, url_en, l_en, url_de, l_de, \
+                            total_langs, categories_sv, images_sv,             \
+                            links_sv, linkshere_sv, extlinks_sv, redirects_sv, \
+                            contributors_sv, revisions_cnt_sv, categories_fi,  \
+                            images_fi, links_fi, linkshere_fi, extlinks_fi,    \
+                            redirects_fi, contributors_fi, revisions_cnt_fi,   \
+                            categories_en, images_en, links_en, linkshere_en,  \
+                            extlinks_en, redirects_en, contributors_en,        \
+                            revisions_cnt_en, categories_de, images_de,        \
+                            links_de, linkshere_de, extlinks_de, redirects_de, \
+                            contributors_de, revisions_cnt_de])
+        print(f"Skapade csv-filen {filename} ({f.tell()} tecken)")
+
 
 def save_as_html_lang(d, e, api_fields, category):
     """Create html table with listing lengths of pages in all available languages and save as html file."""
@@ -1016,7 +1205,7 @@ def save_as_html_lang(d, e, api_fields, category):
     langs = {}
     pages = d['pages']
     for p in pages:
-        lang = p.split("(")[1].strip(")")
+        lang = p.split("(")[-1].strip(")")
         # language is at end, eg. (de), but the page title itself may contain parentheses
         #  that do not refer to language - skip those!
         is_a_lang = len(lang) < 4 or lang == "simple"
@@ -1030,13 +1219,11 @@ def save_as_html_lang(d, e, api_fields, category):
             if pv is not None:
                 langs[lang] += pv
     print(f"languages, unsorted {langs}")
-    sorted_langs = [(k, langs[k]) for k in sorted(langs, key=langs.get, reverse=True)]
-    print(f"languages, sorted {sorted_langs}")
     h += html.start_table(column_count=13)
 
     subh1 = th("No") + thl("Article")
-    for l in sorted_langs:
-        subh1 += th(l[0])
+    for l in langs:
+        subh1 += th(l)
     subh1 = tr(subh1)
 
     l_categories = list(d['categories'])
@@ -1045,32 +1232,48 @@ def save_as_html_lang(d, e, api_fields, category):
     for title in l_categories:
         print(f"Overall title {title}")
         i_cat += 1
-        en_pages = d['categories'][title]['pages']
+        pages = d['categories'][title]['pages']
+
+        sorted_pages = {}
+        for page in pages:
+            if page not in d['pages']:
+                continue
+            sorted_pages[page] = d['pages'][page]
+        def comparer(left, right):
+            for lang_column in langs:
+                l_stats = sorted_pages[left]['lang_stats'].get(lang_column, {})
+                l = int(l_stats.get('pageviews_tot', 0))
+                r_stats = sorted_pages[right]['lang_stats'].get(lang_column, {})
+                r = int(r_stats.get('pageviews_tot', 0))
+                t =  r - l
+                if t:
+                    return t
+            return 0
+        sorted_pages = sorted(sorted_pages, key=cmp_to_key(comparer))
 
         cls = ""
+        h += html.h2(f"{i_cat}. {title}", cls=cls)
         h += subh1
         i_p = 0
         url_s = "<a href='https://{}.wikipedia.org/wiki/{}'>{}</a>"
-        for en_page in en_pages:
-            if en_page not in d['pages']:
-                continue
-            en_title = d['pages'][en_page]['title']
-            en_pv = d['pages'][en_page]['stats']['pageviews_tot']
-            url_en = url_s.format("en", en_title, en_title)
-            url_en_pv = url_s.format("en", en_title, en_pv)
+        for page in sorted_pages:
+            lang = page.split("(")[-1].strip(")")
+            title = d['pages'][page]['title']
+            pv = d['pages'][page]['stats']['pageviews_tot']
+            url = url_s.format(lang, title, title)
+            url_pv = url_s.format(lang, title, pv)
             lang_dict = {}
-            for k in d['pages'][en_page]['langlinks']:
+            for k in d['pages'][page]['langlinks']:
                 lang_dict[list(k)[0]] = k[list(k)[0]]
-            # print(f"== en_page = {en_page} title {en_title} dict {lang_dict}")
+            # print(f"== page = {page} title {title} dict {lang_dict}")
             i_p += 1
-            row = tdr(i_p) + td(url_en) + tdr(url_en_pv)
-            for lang_pair in sorted_langs:
-                # print(f"pair {lang_pair}")
-                lang_column = lang_pair[0]
-                if lang_column == "en":
+            row = tdr(i_p) + td(url)
+            for lang_column in langs:
+                if lang_column == lang:
+                    row += tdr(url_pv)
                     continue
                 cell = ""
-                if 'langlinks' in d['pages'][en_page]:
+                if 'langlinks' in d['pages'][page]:
                     has_lang = lang_column in lang_dict
                     if has_lang:
                         page_in_lang = lang_dict[lang_column] + " (" + lang_column + ")"

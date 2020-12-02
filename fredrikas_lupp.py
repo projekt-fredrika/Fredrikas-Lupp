@@ -108,6 +108,7 @@ Example: python3 fredrikas_lupp.py scrape Nagu 'sv|fi|en|de' 2
     utils.save_used_cache(jsonfile)
     scrape.save_as_html(d, e, api_fields, top_category)
     scrape.save_as_html_lang(d, e, api_fields, top_category)
+    scrape.save_as_csv(d, e, api_fields, top_category)
 
     utils.exit_program(start)
 
@@ -125,6 +126,7 @@ Same as scrape, but only scrapes secondary language. Only for development use.
     utils.save_used_cache(jsonfile)
     scrape.save_as_html(d, e, api_fields, top_category)
     scrape.save_as_html_lang(d, e, api_fields, top_category)
+    scrape.save_as_csv(d, e, api_fields, top_category)
     utils.exit_program(start)
 
 if cmd == "scrape_list":
@@ -152,6 +154,7 @@ Beep Boop
     utils.save_used_cache(jsonfile)
     scrape.save_as_html(d, e, api_fields, top_category)
     scrape.save_as_html_lang(d, e, api_fields, top_category)
+    scrape.save_as_csv(d, e, api_fields, top_category)
 
     utils.exit_program(start)
 
@@ -205,6 +208,7 @@ file in html/DATE/ direcotry and selects this categry as to be used for next com
     utils.save_used_cache(jsonfile)
     scrape.save_as_html(d, e, api_fields, top_category)
     scrape.save_as_html_lang(d, e, api_fields, top_category)
+    scrape.save_as_csv(d, e, api_fields, top_category)
     print("---------------")
     file_date = d['stats']['scrape_start'][:10]
     utils.save_json_file(jsonfile, d, dir_date=file_date)
