@@ -374,9 +374,18 @@ def _scrape_article_list(d, e, sites, api_fields, filename, lang="en"):
                         d['pages'][full_title_lang]['contributors'].append(item['name'])
 
                 if 'langlinks' in pageinfo:
+                    ll = d['pages'][full_title_lang]['langlinks']
                     for item in pageinfo['langlinks']:
-                        lang_item = {item['lang']: item['*']}
-                        d['pages'][full_title_lang]['langlinks'].append(lang_item)
+                        if item['lang'] == 'nb':
+                            if 'no' not in pageinfo['langlinks'] and \
+                               'nn' not in pageinfo['langlinks']:
+                                ll.append({'no': item['*']})
+                            continue
+                        if item['lang'] == 'nn':
+                            if 'no' not in pageinfo['langlinks']:
+                                ll.append({'no': item['*']})
+                            continue
+                        ll.append({item['lang']: item['*']})
 
                 # Loop individual non-scalar fields with 'title'
                 for fld in api_fields["has_title"]:
@@ -502,9 +511,18 @@ def _scrape_pages(d, e, api_fields, titles, lang, is_category, quickscan=False):
                     d['pages'][full_title_lang]['contributors'].append(item['name'])
 
             if 'langlinks' in pageinfo:
+                ll = d['pages'][full_title_lang]['langlinks']
                 for item in pageinfo['langlinks']:
-                    lang_item = {item['lang']: item['*']}
-                    d['pages'][full_title_lang]['langlinks'].append(lang_item)
+                    if item['lang'] == 'nb':
+                        if 'no' not in pageinfo['langlinks'] and \
+                           'nn' not in pageinfo['langlinks']:
+                            ll.append({'no': item['*']})
+                        continue
+                    if item['lang'] == 'nn':
+                        if 'no' not in pageinfo['langlinks']:
+                            ll.append({'no': item['*']})
+                        continue
+                    ll.append({item['lang']: item['*']})
 
             if not quickscan:
                 # Loop individual non-scalar fields with 'title'
