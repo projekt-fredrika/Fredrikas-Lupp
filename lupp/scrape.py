@@ -972,7 +972,13 @@ def save_as_html(d, e, api_fields, category):
                     if lang == 'de':
                         p_de = item['de']
             url_s = "<a href='https://{}.wikipedia.org/wiki/{}'>{}</a>"
-            url_lang = "fi" if l_sv == 0 else "sv"
+            if l_sv == 0:
+                url_lang = "fi"
+                # if there is no Swedish page, then this is a Finnish page and
+                # the title is the title of the page (it is not in 'langlinks')
+                p_fi = p
+            else:
+                url_lang = "sv"
             url_title = url_s.format(url_lang, short_title, short_title)
             url_title = italic(url_title) if l_sv == 0 else url_title
 
@@ -1163,6 +1169,10 @@ def save_as_csv(d, e, api_fields, category, need_analyse=False):
                             p_en = item['en']
                         if lang == 'de':
                             p_de = item['de']
+                # if there is no Swedish page, then this is a Finnish page and
+                # the title is the title of the page (it is not in 'langlinks')
+                if l_sv == 0:
+                    p_fi = p
 
                 url_fi = "-" if p_fi == "" else str(pv_fi)
                 url_en = "-" if p_en == "" else str(pv_en)
@@ -1590,7 +1600,13 @@ def save_as_wikitext(d, e, api_fields, category, page_type='normal'):
                     if lang in other_langs:
                         final['p'][lang] = item[lang].replace(' ', '&nbsp;')
             url_s = "[https://{}.wikipedia.org/wiki/{} {}]"
-            url_lang = "fi" if l_sv == 0 else "sv"
+            if l_sv == 0:
+                url_lang = "fi"
+                # if there is no Swedish page, then this is a Finnish page and
+                # the title is the title of the page (it is not in 'langlinks')
+                final['p']["fi"] = p.replace(' ', '&nbsp;')
+            else:
+                url_lang = "sv"
             short_title = str(short_title).replace(' ', '&nbsp;')
             url_title = url_s.format(url_lang, short_title, short_title)
             url_title = w_italic(url_title) if l_sv == 0 else url_title
