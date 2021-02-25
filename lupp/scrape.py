@@ -1477,7 +1477,18 @@ def save_as_wikitext(d, e, api_fields, category, page_type='normal'):
     page_title = stats['category_title']
     other_langs = stats['languages'][3:].split('|')
     lang_names = {'sv': 'Svenska', 'fi': 'Finska', 'en': 'Engelska',
-                  'de': 'Tyska', 'no': 'Norska', 'fr': 'Franska'}  # TODO lägg till fler språk
+                  'de': 'Tyska', 'no': 'Norska', 'fr': 'Franska'}
+    try:
+        site = wiki.Wiki(f"https://sv.wikipedia.org/w/api.php")
+        params = {'action': 'query', 'meta': 'languageinfo',
+                  'liprop': 'name', 'uselang': 'sv'}
+        req_links = api.APIRequest(site, params)
+        for sub_result in req_links.queryGen():  # async_gen(req_links):
+            for k, v in sub_result['query']['languageinfo'].items():
+                lang_names[k] = v['name'].capitalize()
+    except exceptions.APIError as we:
+        e['error_analyze'] = {'info': we.args, }
+        print('Failed to get language information from Wiki')
     datum = stats['scraped'][:-3]
     date_from = stats['date_from']
     date_to = stats['date_to']
@@ -1497,7 +1508,7 @@ def save_as_wikitext(d, e, api_fields, category, page_type='normal'):
     h1 += lang_headers
     h1 = [h1[0]] + [align(h, 'center') for h in h1[1:]]
 
-    h2 = ['Visat', '% av fi', 'Längd', '% av fi', 'Kvalitet'] + ['Visat', 'Längd'] * 3
+    h2 = ['Visat', '% av fi', 'Längd', '% av fi', 'Kvalitet'] + ['Visat', 'Längd'] * len(other_langs)
     h2.append('Språk (Totalt)')
     subh = table_start(h1, h2)
 
