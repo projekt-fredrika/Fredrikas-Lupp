@@ -143,7 +143,7 @@ def scrape_launch(d, e, sites, api_fields, max_depth, blacklist, category_title,
                 if "invalidcategory" in we.args:
                     print("Felaktig kategori, avbryter programmet")
                     return False
-
+        with concurrent.futures.ThreadPoolExecutor(max_workers=5) as tpe:
             try:
                 _scrape_missing_primary_language(d, e, max_depth, sites, blacklist, api_fields, tpe=tpe)
             except exceptions.APIError as we:
