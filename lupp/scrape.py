@@ -143,7 +143,7 @@ def scrape_launch(d, e, sites, api_fields, max_depth, blacklist, category_title,
                 if "invalidcategory" in we.args:
                     print("Felaktig kategori, avbryter programmet")
                     return False
-
+        with concurrent.futures.ThreadPoolExecutor(max_workers=5) as tpe:
             try:
                 _scrape_missing_primary_language(d, e, max_depth, sites, blacklist, api_fields, tpe=tpe)
             except exceptions.APIError as we:
@@ -374,9 +374,18 @@ def _scrape_article_list(d, e, sites, api_fields, filename, lang="en"):
                         d['pages'][full_title_lang]['contributors'].append(item['name'])
 
                 if 'langlinks' in pageinfo:
+                    ll = d['pages'][full_title_lang]['langlinks']
                     for item in pageinfo['langlinks']:
-                        lang_item = {item['lang']: item['*']}
-                        d['pages'][full_title_lang]['langlinks'].append(lang_item)
+                        if item['lang'] == 'nb':
+                            if 'no' not in pageinfo['langlinks'] and \
+                               'nn' not in pageinfo['langlinks']:
+                                ll.append({'no': item['*']})
+                            continue
+                        if item['lang'] == 'nn':
+                            if 'no' not in pageinfo['langlinks']:
+                                ll.append({'no': item['*']})
+                            continue
+                        ll.append({item['lang']: item['*']})
 
                 # Loop individual non-scalar fields with 'title'
                 for fld in api_fields["has_title"]:
@@ -502,9 +511,18 @@ def _scrape_pages(d, e, api_fields, titles, lang, is_category, quickscan=False):
                     d['pages'][full_title_lang]['contributors'].append(item['name'])
 
             if 'langlinks' in pageinfo:
+                ll = d['pages'][full_title_lang]['langlinks']
                 for item in pageinfo['langlinks']:
-                    lang_item = {item['lang']: item['*']}
-                    d['pages'][full_title_lang]['langlinks'].append(lang_item)
+                    if item['lang'] == 'nb':
+                        if 'no' not in pageinfo['langlinks'] and \
+                           'nn' not in pageinfo['langlinks']:
+                            ll.append({'no': item['*']})
+                        continue
+                    if item['lang'] == 'nn':
+                        if 'no' not in pageinfo['langlinks']:
+                            ll.append({'no': item['*']})
+                        continue
+                    ll.append({item['lang']: item['*']})
 
             if not quickscan:
                 # Loop individual non-scalar fields with 'title'
@@ -972,7 +990,13 @@ def save_as_html(d, e, api_fields, category):
                     if lang == 'de':
                         p_de = item['de']
             url_s = "<a href='https://{}.wikipedia.org/wiki/{}'>{}</a>"
-            url_lang = "fi" if l_sv == 0 else "sv"
+            if l_sv == 0:
+                url_lang = "fi"
+                # if there is no Swedish page, then this is a Finnish page and
+                # the title is the title of the page (it is not in 'langlinks')
+                p_fi = p
+            else:
+                url_lang = "sv"
             url_title = url_s.format(url_lang, short_title, short_title)
             url_title = italic(url_title) if l_sv == 0 else url_title
 
@@ -1163,6 +1187,10 @@ def save_as_csv(d, e, api_fields, category, need_analyse=False):
                             p_en = item['en']
                         if lang == 'de':
                             p_de = item['de']
+                # if there is no Swedish page, then this is a Finnish page and
+                # the title is the title of the page (it is not in 'langlinks')
+                if l_sv == 0:
+                    p_fi = p
 
                 url_fi = "-" if p_fi == "" else str(pv_fi)
                 url_en = "-" if p_en == "" else str(pv_en)
@@ -1601,7 +1629,13 @@ def save_as_wikitext(d, e, api_fields, category, page_type='normal'):
                     if lang in other_langs:
                         final['p'][lang] = item[lang].replace(' ', '&nbsp;')
             url_s = "[https://{}.wikipedia.org/wiki/{} {}]"
-            url_lang = "fi" if l_sv == 0 else "sv"
+            if l_sv == 0:
+                url_lang = "fi"
+                # if there is no Swedish page, then this is a Finnish page and
+                # the title is the title of the page (it is not in 'langlinks')
+                final['p']["fi"] = p.replace(' ', '&nbsp;')
+            else:
+                url_lang = "sv"
             short_title = str(short_title).replace(' ', '&nbsp;')
             url_title = url_s.format(url_lang, short_title, short_title)
             url_title = w_italic(url_title) if l_sv == 0 else url_title
