@@ -34,27 +34,27 @@ def analyze_data(d_dict: List, label: str, lang: str) -> List:
     """Extract all data of 'label' from data and return list of values and change"""
     stat_list = []
     for d in d_dict:
-        if label is 'dates':
+        if label == 'dates':
             stat_list.append(datetime.strptime(d['stats']['scraped'][:10], "%Y-%m-%d"))
-        elif label is 'pages':
+        elif label == 'pages':
             stat_list.append(len([p for p in d['pages'] if f"({lang})" in p]))
         buff = []
         for page in d['pages']:
             if f"({lang})" not in page:
                 continue
             dict_key = ''
-            if label is 'pages' or label is 'dates':
+            if label == 'pages' or label == 'dates':
                 break
-            elif label is 'length':
+            elif label == 'length':
                 dict_key = f"len_{lang}"
-            elif label is 'quality':
+            elif label == 'quality':
                 dict_key = f"quality"
-            elif label is 'views':
+            elif label == 'views':
                 dict_key = f"pageviews_{lang}"
             buff.append(int(d['pages'][page]['stats'][dict_key]))
         if buff:
             stat_list.append(sum(buff))
-    if label is 'dates':
+    if label == 'dates':
         return stat_list
     change = stat_list[-1] - stat_list[0]
     avg = stat_list[-1] // len([p for p in d_dict[-1]['pages'] if f"({lang})" in p])
