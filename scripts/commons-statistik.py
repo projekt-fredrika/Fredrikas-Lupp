@@ -264,7 +264,7 @@ def get_wikipedia_articles_by_qid(qids):
 
 def get_wikipedia_views(article_title, platform, days=30):
     headers = {
-        'User-Agent': 'ProjektFredrika/1.0 (robert@projektfredrika.fi)'  # Replace with your app and contact info
+        'User-Agent': 'AppName/1.0 (email)'  # Replace with your app and contact info
     }
     # Format today's date and the start date (30 days ago)
     end_date = datetime.today()
