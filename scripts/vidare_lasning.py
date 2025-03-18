@@ -1,3 +1,6 @@
+# Script to add a template to "Vidare läsning" of swedish wikipedia article. 
+# Used originally with Finlands författare 1809-1916.
+
 import pandas as pd
 import re
 from urllib.parse import unquote
