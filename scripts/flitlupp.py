@@ -8,7 +8,6 @@ which language sites to check.
 
 --user=     - Specify user to check
 
-
 --langs=    - Which languages of wikipedia to check. Pipe ('|') separated list
               Default is --langs=sv|fi|en|de|fr|ru|ee
 
@@ -19,19 +18,22 @@ which language sites to check.
 
 --start=     - See --interval
 
-
 --end=       - See --interval
-
 
 Does not yet support wikidata or other site that are not simply language variants of wikipedia.
 """
 import sys
-
+import json
 import pprint
 import csv
 from datetime import datetime
-from wikitools import wiki, api
+from urllib.request import urlopen, Request
+from urllib.parse import urlencode
 from concurrent.futures import ThreadPoolExecutor, as_completed
+
+
+# User-Agent header
+USER_AGENT = 'FredrikaFlitLupp/1.0 (info@projektfredrika.fi)'
 
 
 def get_args():
@@ -55,21 +57,46 @@ def get_args():
     return args
 
 
-def get_sites(langs):
-    """Take list of languages and return wikitools instances of the sites."""
-    return {l: wiki.Wiki(f"https://{l}.wikipedia.org/w/api.php") for l in langs}
+def api_request(api_url, params):
+    """Make a request to the Wikipedia API with proper headers."""
+    url = f"{api_url}?{urlencode(params)}"
+    request = Request(url, headers={'User-Agent': USER_AGENT})
+    with urlopen(request) as response:
+        return json.loads(response.read().decode('utf-8'))
 
 
-def get_usercontribs(lang, site, params, stop_date):
+def get_usercontribs(lang, api_url, params, stop_date):
+    """Fetch user contributions from Wikipedia API."""
     user_contrib = []
-    req = api.APIRequest(site, params)
-    for resp in req.queryGen():
-        pages = resp['query']['usercontribs']
-        before_end = [p for p in pages if datetime.strptime(p['timestamp'], "%Y-%m-%dT%H:%M:%SZ") > stop_date]
-        user_contrib.extend(before_end)
-        if len(pages) != len(before_end):
-            # Has hit stop date if some pages are filtered away
+    continue_token = None
+    
+    while True:
+        request_params = params.copy()
+        if continue_token:
+            request_params['uccontinue'] = continue_token
+        
+        try:
+            resp = api_request(api_url, request_params)
+            pages = resp.get('query', {}).get('usercontribs', [])
+            
+            # Filter contributions before stop_date
+            before_end = [p for p in pages if datetime.strptime(p['timestamp'], "%Y-%m-%dT%H:%M:%SZ") > stop_date]
+            user_contrib.extend(before_end)
+            
+            # Check if we've hit the stop date
+            if len(pages) != len(before_end):
+                break
+            
+            # Check for continuation token
+            if 'continue' in resp and 'uccontinue' in resp['continue']:
+                continue_token = resp['continue']['uccontinue']
+            else:
+                break
+                
+        except Exception as e:
+            print(f"Error fetching data for {lang}: {e}")
             break
+    
     return lang, user_contrib
 
 
@@ -78,6 +105,10 @@ def analyze_stats(data):
     stats = {}
     data = {k: v for k, v in data.items() if v}
     stats['langs'] = list(data.keys())
+    
+    if not stats['langs']:
+        return stats
+    
     stats['user'] = data[stats['langs'][0]][0]['user']
     all_items = [item for sublist in data.values() for item in sublist]
     stats['count'] = len(all_items)
@@ -87,6 +118,7 @@ def analyze_stats(data):
     stats['article_count'] = len(articles)
     stats['article_additions'] = sum((int(p['sizediff']) for p in articles if int(p['sizediff']) > 0))
     stats['article_deletions'] = sum((int(p['sizediff']) for p in articles if int(p['sizediff']) < 0))
+    
     for l in stats['langs']:
         lang_pages = data[l]
         stats[f"{l}_count"] = len(lang_pages)
@@ -96,6 +128,7 @@ def analyze_stats(data):
         stats[f"{l}_article_count"] = len(lang_articles)
         stats[f"{l}_article_additions"] = sum((int(p['sizediff']) for p in lang_articles if int(p['sizediff']) > 0))
         stats[f"{l}_article_deletions"] = sum((int(p['sizediff']) for p in lang_articles if int(p['sizediff']) < 0))
+    
     return stats
 
 
@@ -106,30 +139,44 @@ def main():
     from_date = args.get('from_date', datetime(1970, 1, 1))
     to_date = args.get('to_date', datetime(2050, 1, 1)).strftime("%Y-%m-%dT%H:%M:%SZ")
     print(f"ARGS: {args}, from_date: {from_date} to_date: {to_date}")
+    
     user_contrib = {}
-    params = {'action': 'query', 'list': 'usercontribs',
-              'ucuser': user, 'uclimit': 500,
-              'ucprop': 'title|sizediff|timestamp', 'ucstart': to_date}
-    sites = get_sites(args.get('langs', ['sv', 'fi', 'en', 'de', 'fr', 'ru', 'ee']))
+    params = {
+        'action': 'query',
+        'list': 'usercontribs',
+        'ucuser': user,
+        'uclimit': '500',
+        'ucprop': 'title|sizediff|timestamp|ids',
+        'ucstart': to_date,
+        'format': 'json'
+    }
+    
+    langs = args.get('langs', ['sv', 'fi', 'en', 'de', 'fr', 'ru', 'ee'])
+    api_urls = {l: f"https://{l}.wikipedia.org/w/api.php" for l in langs}
+    
     with ThreadPoolExecutor(max_workers=5) as tpe:
-        futures = (tpe.submit(get_usercontribs, l, s, params, from_date) for l, s in sites.items())
+        futures = (tpe.submit(get_usercontribs, l, api_url, params, from_date) for l, api_url in api_urls.items())
         for fut in as_completed(futures):
             try:
                 lang, res = fut.result()
                 user_contrib[lang] = res
             except Exception as e:
                 print(f"Exception retrieving data: {e}")
+    
     stats = analyze_stats(user_contrib)
     interval = from_date.strftime('%Y-%m-%d') + '--' + to_date[:10]
+    
     with open(f"{user}_{interval}.txt", 'w') as userfile:
         for key, value in stats.items():
             userfile.write(f"{key}: {value}\n")
+    
     with open(f"{user}_{interval}.csv", 'w') as csvfile:
         writer = csv.writer(csvfile)
         for lang, pages in user_contrib.items():
             for page in pages:
                 fields = [lang, page['title'], page['timestamp'], page['sizediff'], page['ns']]
                 writer.writerow(fields)
+    
     pprint.pprint(user_contrib)
     pprint.pprint(stats)
 
